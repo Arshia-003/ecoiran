@@ -3,177 +3,149 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Empire Builder - نقشه واقعی جهان</title>
+<title>Empire Builder - HOI4 Style Map</title>
 <style>
-  * { margin:0; padding:0; box-sizing:border-box; font-family:'Segoe UI', Tahoma, sans-serif; user-select:none; }
-  body { background:#0a0e17; color:#e0e0e0; overflow:hidden; height:100vh; }
-
-  /* ===== صفحه انتخاب کشور ===== */
-  #selectScreen {
-    position:fixed; inset:0; background:radial-gradient(circle at center,#14243d,#050810);
-    display:flex; flex-direction:column; z-index:100; transition:opacity .6s;
+  :root {
+    --bg-dark: #0a0e17; --panel-bg: rgba(15, 22, 34, 0.92); --panel-border: #2c3e50;
+    --accent-gold: #ffd54f; --accent-green: #66bb6a; --accent-red: #ef5350;
+    --text-main: #e0e0e0; --text-dim: #90a4ae; --shadow-deep: 0 8px 32px rgba(0,0,0,0.6);
   }
-  #selectHeader { padding:16px; text-align:center; background:#0a1220dd; border-bottom:1px solid #263238; z-index:2; }
-  #selectHeader h1 { font-size:1.7rem; color:#ffd54f; text-shadow:0 0 20px #ffb30055; }
-  #selectHeader p { color:#90a4ae; font-size:.82rem; margin-top:3px; }
-  #mapContainer { flex:1; position:relative; overflow:hidden; background:#0d1622; cursor:grab; }
+  * { margin:0; padding:0; box-sizing:border-box; font-family:'Segoe UI', Tahoma, sans-serif; user-select:none; }
+  body { background: var(--bg-dark); color: var(--text-main); overflow:hidden; height:100vh; }
+
+  /* ===== صفحه انتخاب ===== */
+  #selectScreen { position:fixed; inset:0; background: radial-gradient(circle at center, #14243d, #050810); display:flex; flex-direction:column; z-index:100; transition: opacity 0.6s; }
+  #selectHeader { padding:16px; text-align:center; background: rgba(10, 18, 32, 0.85); border-bottom:1px solid #263238; backdrop-filter: blur(10px); z-index:2; }
+  #selectHeader h1 { font-size:1.8rem; color: var(--accent-gold); text-shadow: 0 0 20px rgba(255, 213, 79, 0.3); }
+  #selectHeader p { color: var(--text-dim); font-size:0.85rem; margin-top:4px; }
+  #mapContainer { flex:1; position:relative; overflow:hidden; background: radial-gradient(circle at 50% 50%, #16283d, #0a0e17); cursor:grab; }
   #mapContainer.dragging { cursor:grabbing; }
   #mapContainer svg { width:100%; height:100%; display:block; }
 
-  .countryHit {
-    stroke:#0a0e17; stroke-width:0.5; cursor:pointer;
-    transition:filter .15s, stroke .15s, stroke-width .15s;
-  }
-  .countryHit:hover { filter:brightness(1.6) drop-shadow(0 0 4px #fff); stroke:#ffd54f; stroke-width:1.2; }
-  .countryHit.selectable { cursor:pointer; }
+  /* ===== نقشه اصلی: لایه‌های مختلف ===== */
+  .country-base { stroke: #0a0e17; stroke-width: 0.8; cursor:pointer; transition: filter 0.2s, stroke 0.2s; }
+  .country-base:hover { filter: brightness(1.3) drop-shadow(0 0 6px rgba(255,255,255,0.5)); stroke: var(--accent-gold); stroke-width: 1.5; }
+  
+  /* لایه زمین (کوه/جنگل) — فقط با زوم ظاهر می‌شود */
+  .terrain-layer { pointer-events: none; opacity: 0; transition: opacity 0.4s; }
+  .terrain-layer.visible { opacity: 1; }
+  .mountain { fill: #4e342e; stroke: #2d1f1a; stroke-width: 0.5; }
+  .forest { fill: #2e7d32; opacity: 0.4; }
+  .river { stroke: #42a5f5; stroke-width: 1; fill: none; opacity: 0.5; }
 
-  .countryLabel {
-    fill:#e0e0e0; font-size:5px; font-weight:700; pointer-events:none;
-    text-anchor:middle; dominant-baseline:middle;
-    paint-order:stroke; stroke:#0a0e17; stroke-width:1.2px; stroke-linejoin:round;
-    opacity:0; transition:opacity .2s;
-  }
-  .countryLabel.visible { opacity:1; }
+  /* لایه شهرها و نمادها — فقط با زوم ظاهر می‌شود */
+  .marker-layer { pointer-events: none; opacity: 0; transition: opacity 0.4s; }
+  .marker-layer.visible { opacity: 1; }
+  
+  /* پایتخت: ستاره */
+  .capital-star { fill: #ffd54f; stroke: #000; stroke-width: 0.5; }
+  /* شهر: دایره */
+  .city-circle { fill: #fff; stroke: #000; stroke-width: 0.5; }
+  /* نقطه پیروزی: مربع/پنج‌ضلعی/دایره — در HOI4 بر اساس ارزش [citation:1] */
+  .vp-square { fill: #90a4ae; stroke: #000; stroke-width: 0.4; }
+  .vp-pentagon { fill: #ffb74d; stroke: #000; stroke-width: 0.4; }
+  .vp-circle { fill: #ffd54f; stroke: #000; stroke-width: 0.4; }
+  
+  /* نام شهر/پایتخت — فقط با زوم خیلی زیاد */
+  .city-name { fill: #fff; font-weight: 700; text-anchor: middle; paint-order: stroke; stroke: #000; stroke-width: 1px; opacity: 0; transition: opacity 0.3s; }
+  .city-name.visible { opacity: 1; }
 
-  #tooltip {
-    position:absolute; background:#0f1622f0; border:1px solid #ffd54f;
-    border-radius:8px; padding:6px 12px; pointer-events:none; font-size:.85rem;
-    display:none; z-index:50; color:#ffd54f; font-weight:700; white-space:nowrap;
-    box-shadow:0 4px 12px #000a;
-  }
+  /* نام کشور — اندازه بر اساس مساحت */
+  .country-label { fill: #e0e0e0; font-weight: 700; text-anchor: middle; dominant-baseline: middle; paint-order: stroke; stroke: #0a0e17; stroke-width: 1px; stroke-linejoin: round; opacity: 0; transition: opacity 0.3s; pointer-events: none; }
+  .country-label.visible { opacity: 1; }
 
-  #zoomControls {
-    position:absolute; bottom:16px; right:16px; z-index:30;
-    display:flex; flex-direction:column; gap:6px;
-  }
-  #zoomControls button {
-    width:40px; height:40px; border-radius:10px; border:1px solid #2c3e50;
-    background:#0f1622ee; color:#e0e0e0; cursor:pointer; font-size:1.2rem;
-    font-weight:700; transition:.15s; backdrop-filter:blur(6px);
-  }
-  #zoomControls button:hover { border-color:#ffd54f; color:#ffd54f; }
+  /* ===== بقیه UI (کوتاه شده) ===== */
+  #tooltip { position: absolute; background: var(--panel-bg); border: 1px solid var(--accent-gold); border-radius: 10px; padding: 10px 14px; pointer-events: none; font-size: 0.85rem; display: none; z-index: 50; color: var(--text-main); min-width: 180px; box-shadow: var(--shadow-deep); backdrop-filter: blur(10px); }
+  #tooltip .t-title { color: var(--accent-gold); font-weight: 800; font-size: 1rem; margin-bottom: 6px; border-bottom: 1px solid #ffffff22; padding-bottom: 4px; }
+  #tooltip .t-row { display: flex; justify-content: space-between; margin: 3px 0; font-size: 0.8rem; color: var(--text-dim); }
+  #tooltip .t-row span:last-child { color: var(--text-main); font-weight: 600; }
 
-  /* ===== صفحه بازی ===== */
-  #game { display:none; height:100vh; position:relative; }
-  #gameMap { position:absolute; inset:0; background:#0d1622; overflow:hidden; }
-  #gameMap svg { width:100%; height:100%; }
-  .gameCountry { stroke:#0a0e17; stroke-width:0.5; }
-  .gameCountry.home { stroke:#ffd54f; stroke-width:1.5; filter:drop-shadow(0 0 8px #ffd54f); }
+  #zoomControls { position: absolute; bottom: 20px; right: 20px; z-index: 30; display: flex; flex-direction: column; gap: 8px; }
+  #zoomControls button { width: 44px; height: 44px; border-radius: 12px; border: 1px solid var(--panel-border); background: var(--panel-bg); color: var(--text-main); cursor: pointer; font-size: 1.3rem; font-weight: 700; transition: all 0.2s; backdrop-filter: blur(10px); box-shadow: 0 4px 12px rgba(0,0,0,0.4); }
+  #zoomControls button:hover { border-color: var(--accent-gold); color: var(--accent-gold); transform: scale(1.05); }
+  #hint { position: absolute; bottom: 20px; left: 20px; z-index: 30; background: rgba(15, 22, 34, 0.7); border: 1px solid var(--panel-border); border-radius: 8px; padding: 6px 12px; font-size: 0.75rem; color: var(--text-dim); backdrop-filter: blur(6px); }
 
-  #flagBox {
-    position:absolute; top:14px; left:14px; z-index:20;
-    background:#0f1622ee; border:1px solid #ffd54f88; border-radius:12px;
-    padding:10px 16px; display:flex; align-items:center; gap:12px;
-    backdrop-filter:blur(8px); box-shadow:0 4px 20px #0008;
-  }
-  #flagBox .flag { font-size:2.2rem; line-height:1; }
-  #flagBox .info .name { font-weight:700; color:#ffd54f; font-size:1rem; }
-  #flagBox .info .bonus { font-size:.72rem; color:#90a4ae; }
+  #game { display: none; height: 100vh; position: relative; }
+  #gameMap { position: absolute; inset: 0; background: radial-gradient(circle at 50% 50%, #16283d, #0a0e17); overflow: hidden; cursor: grab; }
+  #gameMap.dragging { cursor: grabbing; }
+  #gameMap svg { width: 100%; height: 100%; }
+  .gameCountry { stroke: #0a0e17; stroke-width: 0.6; transition: filter 0.3s; }
+  .gameCountry.home { stroke: var(--accent-gold); stroke-width: 2; filter: drop-shadow(0 0 12px rgba(255, 213, 79, 0.8)); z-index: 5; }
 
-  #timeBar {
-    position:absolute; top:14px; left:50%; transform:translateX(-50%); z-index:20;
-    background:#0f1622f0; border:1px solid #2c3e50; border-radius:14px;
-    padding:8px 14px; display:flex; align-items:center; gap:6px;
-    backdrop-filter:blur(8px); box-shadow:0 4px 20px #0008;
-  }
-  #dateDisplay { font-weight:700; font-size:1rem; color:#e3f2fd; min-width:140px; text-align:center; padding:0 8px; transition:color .2s; }
-  #dateDisplay.tick { color:#ffd54f; }
-  .speedBtn {
-    background:#182233; border:1px solid #2c3e50; color:#90a4ae; border-radius:8px;
-    padding:6px 11px; cursor:pointer; font-size:.9rem; transition:.15s; font-weight:700;
-  }
-  .speedBtn:hover { border-color:#ffd54f; color:#ffd54f; }
-  .speedBtn.active { background:#ffd54f; color:#0a0e17; border-color:#ffd54f; }
+  .glass-panel { background: var(--panel-bg); border: 1px solid var(--panel-border); border-radius: 14px; backdrop-filter: blur(12px); box-shadow: var(--shadow-deep); }
+  #flagBox { position: absolute; top: 16px; left: 16px; z-index: 20; padding: 10px 16px; display: flex; align-items: center; gap: 12px; }
+  #flagBox .flag { font-size: 2.2rem; line-height: 1; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.5)); }
+  #flagBox .info .name { font-weight: 800; color: var(--accent-gold); font-size: 1.05rem; }
+  #flagBox .info .bonus { font-size: 0.72rem; color: var(--text-dim); }
 
-  #resources {
-    position:absolute; top:14px; right:14px; z-index:20;
-    background:#0f1622f0; border:1px solid #2c3e50; border-radius:12px;
-    padding:12px 16px; min-width:210px; backdrop-filter:blur(8px); box-shadow:0 4px 20px #0008;
-  }
-  #resources .row { display:flex; justify-content:space-between; margin:5px 0; font-size:.88rem; }
-  #resources .row span:last-child { color:#ffd54f; font-weight:700; transition:color .3s; }
-  #resources .row span:last-child.flash { color:#66bb6a; }
-  #resources .row.income span:last-child { color:#66bb6a; }
+  #timeBar { position: absolute; top: 16px; left: 50%; transform: translateX(-50%); z-index: 20; padding: 8px 14px; display: flex; align-items: center; gap: 8px; }
+  #dateDisplay { font-weight: 800; font-size: 1rem; color: var(--text-main); min-width: 150px; text-align: center; padding: 0 8px; transition: color 0.2s; text-shadow: 0 1px 2px #000; }
+  #dateDisplay.tick { color: var(--accent-gold); }
+  .speedBtn { background: rgba(255,255,255,0.05); border: 1px solid var(--panel-border); color: var(--text-dim); border-radius: 8px; padding: 6px 12px; cursor: pointer; font-size: 0.85rem; transition: all 0.2s; font-weight: 700; }
+  .speedBtn:hover { border-color: var(--accent-gold); color: var(--accent-gold); background: rgba(255, 213, 79, 0.1); }
+  .speedBtn.active { background: var(--accent-gold); color: #0a0e17; border-color: var(--accent-gold); box-shadow: 0 0 12px rgba(255, 213, 79, 0.4); }
 
-  #bottomPanel {
-    position:absolute; bottom:14px; left:50%; transform:translateX(-50%); z-index:20;
-    display:flex; gap:8px; flex-wrap:wrap; justify-content:center;
-  }
-  .actionBtn {
-    background:#182233f0; border:1px solid #2c3e50; color:#e0e0e0;
-    border-radius:12px; padding:11px 20px; cursor:pointer; font-size:.9rem;
-    transition:.15s; backdrop-filter:blur(8px); font-weight:600; box-shadow:0 4px 16px #0008;
-  }
-  .actionBtn:hover:not(:disabled) { border-color:#ffd54f; color:#ffd54f; transform:translateY(-2px); }
-  .actionBtn:disabled { opacity:.35; cursor:not-allowed; }
-  .actionBtn.primary { border-color:#ffd54f; color:#ffd54f; }
+  #resources { position: absolute; top: 16px; right: 16px; z-index: 20; padding: 12px 16px; min-width: 220px; }
+  #resources .row { display: flex; justify-content: space-between; margin: 6px 0; font-size: 0.9rem; }
+  #resources .row span:last-child { color: var(--accent-gold); font-weight: 700; transition: color 0.3s; }
+  #resources .row span:last-child.flash { color: var(--accent-green); text-shadow: 0 0 8px rgba(102, 187, 106, 0.5); }
+  #resources .row.income span:last-child { color: var(--accent-green); }
 
-  #assetsPanel {
-    position:absolute; bottom:76px; right:14px; z-index:20; width:270px; max-height:45vh;
-    overflow-y:auto; background:#0f1622f0; border:1px solid #2c3e50; border-radius:12px;
-    padding:14px; display:none; backdrop-filter:blur(8px); box-shadow:0 4px 20px #0008;
-  }
-  #assetsPanel h3 { color:#ffd54f; margin-bottom:10px; font-size:.95rem; }
-  .assetItem { display:flex; justify-content:space-between; padding:7px 0; border-bottom:1px solid #1e2a3a; font-size:.83rem; }
-  .assetItem:last-child { border:none; }
-  .assetItem .income { color:#66bb6a; font-weight:700; }
-  .empty { color:#78909c; font-size:.83rem; text-align:center; padding:10px 0; }
+  #bottomPanel { position: absolute; bottom: 16px; left: 50%; transform: translateX(-50%); z-index: 20; display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; }
+  .actionBtn { background: var(--panel-bg); border: 1px solid var(--panel-border); color: var(--text-main); border-radius: 12px; padding: 12px 22px; cursor: pointer; font-size: 0.9rem; transition: all 0.2s; font-weight: 700; backdrop-filter: blur(10px); box-shadow: 0 4px 16px rgba(0,0,0,0.4); }
+  .actionBtn:hover:not(:disabled) { border-color: var(--accent-gold); color: var(--accent-gold); transform: translateY(-2px); box-shadow: 0 6px 20px rgba(0,0,0,0.5); }
+  .actionBtn:disabled { opacity: 0.35; cursor: not-allowed; }
+  .actionBtn.primary { border-color: var(--accent-gold); color: var(--accent-gold); }
+  .actionBtn.primary:hover:not(:disabled) { background: rgba(255, 213, 79, 0.15); }
 
-  #modal { position:fixed; inset:0; background:#000a; z-index:200; display:none; align-items:center; justify-content:center; }
-  #modal .box { background:#101a28; border:1px solid #ffd54f66; border-radius:16px; padding:26px; width:420px; max-width:92vw; box-shadow:0 10px 40px #000; }
-  #modal h2 { color:#ffd54f; margin-bottom:18px; font-size:1.2rem; }
-  .companyOption { background:#182233; border:1px solid #2c3e50; border-radius:10px; padding:14px; margin-bottom:10px; cursor:pointer; transition:.15s; }
-  .companyOption:hover { border-color:#ffd54f; background:#233149; transform:translateX(-4px); }
-  .companyOption .title { font-weight:700; margin-bottom:4px; color:#e3f2fd; }
-  .companyOption .desc { font-size:.78rem; color:#90a4ae; }
-  #modal .close { margin-top:12px; background:#263238; color:#e0e0e0; border:none; border-radius:8px; padding:12px; width:100%; cursor:pointer; font-weight:600; }
-  #modal .close:hover { background:#37474f; }
+  #mapModeBar { position: absolute; top: 80px; left: 50%; transform: translateX(-50%); z-index: 15; display: flex; gap: 6px; padding: 6px; border-radius: 10px; }
+  .modeBtn { background: transparent; border: 1px solid transparent; color: var(--text-dim); border-radius: 6px; padding: 6px 14px; cursor: pointer; font-size: 0.8rem; transition: all 0.2s; font-weight: 600; }
+  .modeBtn:hover { color: var(--text-main); background: rgba(255,255,255,0.05); }
+  .modeBtn.active { background: rgba(255, 213, 79, 0.15); color: var(--accent-gold); border-color: rgba(255, 213, 79, 0.3); }
 
-  #toast {
-    position:fixed; top:80px; left:50%; transform:translateX(-50%);
-    background:#ffd54f; color:#0a0e17; padding:12px 24px; border-radius:10px;
-    font-weight:700; z-index:300; opacity:0; transition:.3s; pointer-events:none;
-    box-shadow:0 6px 24px #ffd54f44;
-  }
-  #toast.show { opacity:1; }
-  #toast.error { background:#ef5350; color:#fff; box-shadow:0 6px 24px #ef535044; }
+  #assetsPanel { position: absolute; bottom: 80px; right: 16px; z-index: 20; width: 280px; max-height: 45vh; overflow-y: auto; padding: 16px; display: none; }
+  #assetsPanel h3 { color: var(--accent-gold); margin-bottom: 12px; font-size: 0.95rem; border-bottom: 1px solid #ffffff11; padding-bottom: 8px; }
+  .assetItem { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #1e2a3a; font-size: 0.85rem; }
+  .assetItem:last-child { border: none; }
+  .assetItem .income { color: var(--accent-green); font-weight: 700; }
+  .empty { color: var(--text-dim); font-size: 0.85rem; text-align: center; padding: 12px 0; }
 
-  #loading { position:fixed; inset:0; background:#0a0e17; display:flex; align-items:center; justify-content:center; z-index:500; flex-direction:column; gap:16px; }
-  #loading .spinner { width:48px; height:48px; border:4px solid #263238; border-top-color:#ffd54f; border-radius:50%; animation:spin 1s linear infinite; }
-  @keyframes spin { to { transform:rotate(360deg); } }
-  #loading p { color:#90a4ae; font-size:.9rem; }
+  #modal { position: fixed; inset: 0; background: rgba(0,0,0,0.7); z-index: 200; display: none; align-items: center; justify-content: center; backdrop-filter: blur(4px); }
+  #modal .box { background: #101a28; border: 1px solid rgba(255, 213, 79, 0.4); border-radius: 18px; padding: 28px; width: 440px; max-width: 92vw; box-shadow: 0 20px 60px #000; }
+  #modal h2 { color: var(--accent-gold); margin-bottom: 20px; font-size: 1.2rem; text-align: center; }
+  .companyOption { background: rgba(255,255,255,0.03); border: 1px solid var(--panel-border); border-radius: 12px; padding: 16px; margin-bottom: 12px; cursor: pointer; transition: all 0.2s; }
+  .companyOption:hover { border-color: var(--accent-gold); background: rgba(255, 213, 79, 0.08); transform: translateX(-6px); }
+  .companyOption .title { font-weight: 800; margin-bottom: 6px; color: var(--text-main); }
+  .companyOption .desc { font-size: 0.8rem; color: var(--text-dim); line-height: 1.4; }
+  #modal .close { margin-top: 16px; background: rgba(255,255,255,0.05); color: var(--text-main); border: 1px solid var(--panel-border); border-radius: 10px; padding: 12px; width: 100%; cursor: pointer; font-weight: 700; transition: all 0.2s; }
+  #modal .close:hover { background: rgba(255,255,255,0.1); border-color: var(--text-dim); }
 
-  #hint {
-    position:absolute; bottom:16px; left:16px; z-index:30;
-    background:#0f1622cc; border:1px solid #2c3e50; border-radius:8px;
-    padding:6px 12px; font-size:.75rem; color:#90a4ae;
-  }
+  #toast { position: fixed; top: 80px; left: 50%; transform: translateX(-50%); background: var(--accent-gold); color: #0a0e17; padding: 12px 28px; border-radius: 12px; font-weight: 800; z-index: 300; opacity: 0; transition: all 0.3s; pointer-events: none; box-shadow: 0 8px 30px rgba(255, 213, 79, 0.4); }
+  #toast.show { opacity: 1; transform: translateX(-50%) translateY(4px); }
+  #toast.error { background: var(--accent-red); color: #fff; box-shadow: 0 8px 30px rgba(239, 83, 80, 0.4); }
+
+  #loading { position: fixed; inset: 0; background: var(--bg-dark); display: flex; align-items: center; justify-content: center; z-index: 500; flex-direction: column; gap: 20px; }
+  #loading .spinner { width: 50px; height: 50px; border: 4px solid #263238; border-top-color: var(--accent-gold); border-radius: 50%; animation: spin 1s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  #loading p { color: var(--text-dim); font-size: 0.9rem; letter-spacing: 1px; }
 </style>
 </head>
 <body>
 
-<div id="loading">
-  <div class="spinner"></div>
-  <p>در حال بارگذاری نقشه جهان...</p>
-</div>
+<div id="loading"><div class="spinner"></div><p>در حال بارگذاری نقشه جهان...</p></div>
 
 <div id="selectScreen" style="display:none;">
-  <div id="selectHeader">
-    <h1>🌍 EMPIRE BUILDER</h1>
-    <p>روی کشور خود کلیک کنید | با اسکرول زوم کنید | با درگ جابه‌جا کنید</p>
-  </div>
+  <div id="selectHeader"><h1>🌍 EMPIRE BUILDER</h1><p>کشور خود را انتخاب کنید | اسکرول = زوم | درگ = جابه‌جایی</p></div>
   <div id="mapContainer">
     <svg id="worldMap" viewBox="0 0 1000 500" preserveAspectRatio="xMidYMid meet">
       <rect width="1000" height="500" fill="#0d1622"/>
+      <g id="terrainLayerSelect" class="terrain-layer"></g>
       <g id="countriesLayer"></g>
+      <g id="markerLayerSelect" class="marker-layer"></g>
     </svg>
     <div id="tooltip"></div>
-    <div id="zoomControls">
-      <button id="zoomIn">+</button>
-      <button id="zoomOut">−</button>
-      <button id="zoomReset">⟲</button>
-    </div>
-    <div id="hint">🖱 اسکرول=زوم | درگ=جابه‌جایی</div>
+    <div id="zoomControls"><button id="zoomIn">+</button><button id="zoomOut">−</button><button id="zoomReset">⟲</button></div>
+    <div id="hint">🖱 اسکرول = زوم | درگ = جابه‌جایی | با زوم، زمین و شهرها دیده می‌شوند</div>
   </div>
 </div>
 
@@ -181,659 +153,328 @@
   <div id="gameMap">
     <svg id="gameSvg" viewBox="0 0 1000 500" preserveAspectRatio="xMidYMid slice">
       <rect width="1000" height="500" fill="#0d1622"/>
+      <g id="terrainLayerGame" class="terrain-layer"></g>
       <g id="gameCountriesLayer"></g>
+      <g id="markerLayerGame" class="marker-layer"></g>
     </svg>
   </div>
 
-  <div id="flagBox">
-    <span class="flag" id="flagIcon">🏳️</span>
-    <div class="info">
-      <div class="name" id="flagName">—</div>
-      <div class="bonus" id="flagBonus">—</div>
-    </div>
-  </div>
-
-  <div id="timeBar">
-    <button class="speedBtn" data-speed="0" title="توقف">⏸</button>
-    <button class="speedBtn active" data-speed="1">۱x</button>
-    <button class="speedBtn" data-speed="2">۲x</button>
-    <button class="speedBtn" data-speed="4">۴x</button>
-    <button class="speedBtn" data-speed="8">۸x</button>
-    <div id="dateDisplay">۱ ژانویه ۱۸۳۶</div>
-  </div>
-
-  <div id="resources">
-    <div class="row"><span>💰 پول</span><span id="money">۱۰,۰۰۰</span></div>
-    <div class="row"><span>🏭 کمپانی</span><span id="companyName">—</span></div>
-    <div class="row"><span>⛏ دارایی‌ها</span><span id="assetCount">۰</span></div>
-    <div class="row income"><span>📈 درآمد/ماه</span><span id="income">۰</span></div>
-  </div>
-
-  <div id="bottomPanel">
-    <button class="actionBtn primary" id="buildCompanyBtn">🏗 ساخت کمپانی</button>
-    <button class="actionBtn" id="buyMineBtn" disabled>⛏ خرید معدن (۵,۰۰۰)</button>
-    <button class="actionBtn" id="upgradeBtn" disabled>⬆ ارتقاء</button>
-    <button class="actionBtn" id="assetsToggleBtn" disabled>📋 دارایی‌ها</button>
-  </div>
-
-  <div id="assetsPanel">
-    <h3>📋 دارایی‌های شما</h3>
-    <div id="assetsList"></div>
-  </div>
+  <div id="flagBox" class="glass-panel"><span class="flag" id="flagIcon">🏳️</span><div class="info"><div class="name" id="flagName">—</div><div class="bonus" id="flagBonus">—</div></div></div>
+  <div id="timeBar" class="glass-panel"><button class="speedBtn" data-speed="0">⏸</button><button class="speedBtn active" data-speed="1">۱x</button><button class="speedBtn" data-speed="2">۲x</button><button class="speedBtn" data-speed="4">۴x</button><button class="speedBtn" data-speed="8">۸x</button><div id="dateDisplay">۱ ژانویه ۱۸۳۶</div></div>
+  <div id="mapModeBar" class="glass-panel"><button class="modeBtn active" data-mode="political">🗺️ سیاسی</button><button class="modeBtn" data-mode="wealth">💰 ثروت</button><button class="modeBtn" data-mode="industry">🏭 صنعت</button></div>
+  <div id="resources" class="glass-panel"><div class="row"><span>💰 پول</span><span id="money">۱۰,۰۰۰</span></div><div class="row"><span>🏭 کمپانی</span><span id="companyName">—</span></div><div class="row"><span>⛏ دارایی‌ها</span><span id="assetCount">۰</span></div><div class="row income"><span>📈 درآمد/ماه</span><span id="income">۰</span></div></div>
+  <div id="bottomPanel"><button class="actionBtn primary" id="buildCompanyBtn">🏗 ساخت کمپانی</button><button class="actionBtn" id="buyMineBtn" disabled>⛏ خرید معدن (۵,۰۰۰)</button><button class="actionBtn" id="upgradeBtn" disabled>⬆ ارتقاء</button><button class="actionBtn" id="assetsToggleBtn" disabled>📋 دارایی‌ها</button></div>
+  <div id="assetsPanel" class="glass-panel"><h3>📋 دارایی‌های شما</h3><div id="assetsList"></div></div>
 </div>
 
 <div id="modal"><div class="box" id="modalBox"></div></div>
 <div id="toast"></div>
 
+<script src="https://unpkg.com/d3@7.9.0/dist/d3.min.js"></script>
+<script src="https://unpkg.com/topojson-client@3.1.0/dist/topojson-client.min.js"></script>
+
 <script>
-/* ============================================================
-   بارگذاری نقشه از CDN
-   ============================================================ */
 const MAP_URL = 'https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json';
-const TOPO_URL = 'https://cdn.jsdelivr.net/npm/topojson-client@3/dist/topojson-client.min.js';
+const COUNTRY_INFO = { 'Iran': { name:'ایران', flag:'🇮🇷', bonus:'نفت +۲۰٪', gov:'امپراتوری' }, 'United States of America': { name:'آمریکا', flag:'🇺🇸', bonus:'صنعت +۲۵٪', gov:'جمهوری' }, 'Germany': { name:'آلمان', flag:'🇩🇪', bonus:'تکنولوژی +۳۰٪', gov:'امپراتوری' }, 'United Kingdom': { name:'انگلستان', flag:'🇬🇧', bonus:'تجارت +۲۰٪', gov:'پادشاهی' }, 'France': { name:'فرانسه', flag:'🇫🇷', bonus:'کشاورزی +۲۰٪', gov:'پادشاهی' }, 'Russia': { name:'روسیه', flag:'🇷🇺', bonus:'معدن +۲۵٪', gov:'امپراتوری' }, 'China': { name:'چین', flag:'🇨🇳', bonus:'تولید +۳۰٪', gov:'امپراتوری' }, 'Japan': { name:'ژاپن', flag:'🇯🇵', bonus:'تکنولوژی +۲۵٪', gov:'امپراتوری' }, 'India': { name:'هند', flag:'🇮🇳', bonus:'نیروی کار +۲۰٪', gov:'امپراتوری' }, 'Brazil': { name:'برزیل', flag:'🇧🇷', bonus:'کشاورزی +۲۵٪', gov:'امپراتوری' }, 'Canada': { name:'کانادا', flag:'🇨🇦', bonus:'معدن +۲۰٪', gov:'مستعمره' }, 'Australia': { name:'استرالیا', flag:'🇦🇺', bonus:'معدن +۳۰٪', gov:'مستعمره' }, 'Turkey': { name:'ترکیه', flag:'🇹🇷', bonus:'تجارت +۱۵٪', gov:'امپراتوری' }, 'Egypt': { name:'مصر', flag:'🇪🇬', bonus:'تجارت +۱۵٪', gov:'پاشایی' }, 'Saudi Arabia': { name:'عربستان', flag:'🇸🇦', bonus:'نفت +۳۰٪', gov:'پادشاهی' }, 'South Korea': { name:'کره جنوبی', flag:'🇰🇷', bonus:'تکنولوژی +۲۵٪', gov:'پادشاهی' }, 'South Africa': { name:'آفریقای جنوبی', flag:'🇿🇦', bonus:'معدن +۲۵٪', gov:'مستعمره' }, 'Mexico': { name:'مکزیک', flag:'🇲🇽', bonus:'نفت +۱۵٪', gov:'جمهوری' }, 'Italy': { name:'ایتالیا', flag:'🇮🇹', bonus:'تجارت +۱۵٪', gov:'پادشاهی' }, 'Spain': { name:'اسپانیا', flag:'🇪🇸', bonus:'کشاورزی +۱۵٪', gov:'پادشاهی' }, 'Argentina': { name:'آرژانتین', flag:'🇦🇷', bonus:'کشاورزی +۲۰٪', gov:'جمهوری' }, 'Indonesia': { name:'اندونزی', flag:'🇮🇩', bonus:'نیروی کار +۲۰٪', gov:'مستعمره' }, 'Nigeria': { name:'نیجریه', flag:'🇳🇬', bonus:'نفت +۲۰٪', gov:'امپراتوری' }, 'Pakistan': { name:'پاکستان', flag:'🇵🇰', bonus:'نیروی کار +۱۵٪', gov:'امپراتوری' }, 'Iraq': { name:'عراق', flag:'🇮🇶', bonus:'نفت +۲۵٪', gov:'امپراتوری' }, 'Afghanistan': { name:'افغانستان', flag:'🇦🇫', bonus:'معدن +۱۵٪', gov:'امارت' }, 'Netherlands': { name:'هلند', flag:'🇳🇱', bonus:'تجارت +۲۰٪', gov:'پادشاهی' }, 'Poland': { name:'لهستان', flag:'🇵🇱', bonus:'صنعت +۱۵٪', gov:'پادشاهی' }, 'Ukraine': { name:'اوکراین', flag:'🇺🇦', bonus:'کشاورزی +۲۵٪', gov:'امپراتوری' }, 'Sweden': { name:'سوئد', flag:'🇸🇪', bonus:'تکنولوژی +۲۰٪', gov:'پادشاهی' }, 'Norway': { name:'نروژ', flag:'🇳🇴', bonus:'نفت +۲۰٪', gov:'پادشاهی' }, 'Vietnam': { name:'ویتنام', flag:'🇻🇳', bonus:'نیروی کار +۲۰٪', gov:'امپراتوری' }, 'Thailand': { name:'تایلند', flag:'🇹🇭', bonus:'تجارت +۱۵٪', gov:'پادشاهی' }, 'Malaysia': { name:'مالزی', flag:'🇲🇾', bonus:'تجارت +۱۵٪', gov:'پادشاهی' }, 'Philippines': { name:'فیلیپین', flag:'🇵🇭', bonus:'نیروی کار +۱۵٪', gov:'مستعمره' }, 'Colombia': { name:'کلمبیا', flag:'🇨🇴', bonus:'کشاورزی +۱۵٪', gov:'جمهوری' }, 'Chile': { name:'شیلی', flag:'🇨🇱', bonus:'معدن +۲۵٪', gov:'جمهوری' }, 'Peru': { name:'پرو', flag:'🇵🇪', bonus:'معدن +۲۰٪', gov:'جمهوری' }, 'Venezuela': { name:'ونزوئلا', flag:'🇻🇪', bonus:'نفت +۲۵٪', gov:'جمهوری' }, 'Kazakhstan': { name:'قزاقستان', flag:'🇰🇿', bonus:'معدن +۲۰٪', gov:'امپراتوری' }, 'Algeria': { name:'الجزایر', flag:'🇩🇿', bonus:'نفت +۲۰٪', gov:'مستعمره' }, 'Morocco': { name:'مراکش', flag:'🇲🇦', bonus:'کشاورزی +۱۵٪', gov:'پادشاهی' }, 'Ethiopia': { name:'اتیوپی', flag:'🇪🇹', bonus:'کشاورزی +۱۵٪', gov:'امپراتوری' }, 'Kenya': { name:'کنیا', flag:'🇰🇪', bonus:'کشاورزی +۱۵٪', gov:'مستعمره' }, 'Greece': { name:'یونان', flag:'🇬🇷', bonus:'تجارت +۱۵٪', gov:'پادشاهی' }, 'Portugal': { name:'پرتغال', flag:'🇵🇹', bonus:'تجارت +۱۵٪', gov:'پادشاهی' }, 'Belgium': { name:'بلژیک', flag:'🇧🇪', bonus:'تجارت +۲۰٪', gov:'پادشاهی' }, 'Switzerland': { name:'سوئیس', flag:'🇨🇭', bonus:'تکنولوژی +۲۵٪', gov:'جمهوری' }, 'Austria': { name:'اتریش', flag:'🇦🇹', bonus:'صنعت +۱۵٪', gov:'امپراتوری' }, 'Czechia': { name:'چک', flag:'🇨🇿', bonus:'صنعت +۱۵٪', gov:'پادشاهی' }, 'Romania': { name:'رومانی', flag:'🇷🇴', bonus:'کشاورزی +۱۵٪', gov:'پادشاهی' }, 'Hungary': { name:'مجارستان', flag:'🇭🇺', bonus:'صنعت +۱۵٪', gov:'پادشاهی' }, 'Finland': { name:'فنلاند', flag:'🇫🇮', bonus:'تکنولوژی +۲۰٪', gov:'دوک‌نشین' }, 'Denmark': { name:'دانمارک', flag:'🇩🇰', bonus:'تجارت +۱۵٪', gov:'پادشاهی' }, 'Ireland': { name:'ایرلند', flag:'🇮🇪', bonus:'تکنولوژی +۲۰٪', gov:'مستعمره' }, 'New Zealand': { name:'نیوزیلند', flag:'🇳🇿', bonus:'کشاورزی +۲۰٪', gov:'مستعمره' }, 'Bangladesh': { name:'بنگلادش', flag:'🇧🇩', bonus:'نیروی کار +۲۰٪', gov:'مستعمره' }, 'Myanmar': { name:'میانمار', flag:'🇲🇲', bonus:'کشاورزی +۱۵٪', gov:'پادشاهی' }, 'Sri Lanka': { name:'سریلانکا', flag:'🇱🇰', bonus:'تجارت +۱۵٪', gov:'مستعمره' }, 'Nepal': { name:'نپال', flag:'🇳🇵', bonus:'کشاورزی +۱۵٪', gov:'پادشاهی' }, 'Uzbekistan': { name:'ازبکستان', flag:'🇺🇿', bonus:'کشاورزی +۱۵٪', gov:'خانات' }, 'Azerbaijan': { name:'آذربایجان', flag:'🇦🇿', bonus:'نفت +۲۰٪', gov:'خانات' }, 'Georgia': { name:'گرجستان', flag:'🇬🇪', bonus:'تجارت +۱۵٪', gov:'پادشاهی' }, 'Armenia': { name:'ارمنستان', flag:'🇦🇲', bonus:'تکنولوژی +۱۵٪', gov:'خانات' }, 'Syria': { name:'سوریه', flag:'🇸🇾', bonus:'کشاورزی +۱۵٪', gov:'پاشایی' }, 'Jordan': { name:'اردن', flag:'🇯🇴', bonus:'تجارت +۱۵٪', gov:'امارت' }, 'Lebanon': { name:'لبنان', flag:'🇱🇧', bonus:'تجارت +۱۵٪', gov:'پاشایی' }, 'Israel': { name:'اسرائیل', flag:'🇮🇱', bonus:'تکنولوژی +۲۵٪', gov:'پاشایی' }, 'Kuwait': { name:'کویت', flag:'🇰🇼', bonus:'نفت +۲۵٪', gov:'امارت' }, 'Qatar': { name:'قطر', flag:'🇶🇦', bonus:'نفت +۲۵٪', gov:'امارت' }, 'United Arab Emirates': { name:'امارات', flag:'🇦🇪', bonus:'نفت +۲۵٪', gov:'امارت' }, 'Oman': { name:'عمان', flag:'🇴🇲', bonus:'نفت +۲۰٪', gov:'امارت' }, 'Yemen': { name:'یمن', flag:'🇾🇪', bonus:'نفت +۱۵٪', gov:'امارت' } };
+const COMPANIES = [ { id:'mining', title:'⛏ شرکت معدنی', desc:'درآمد پایه ۱۵۰/ماه — می‌توانید معدن بخرید', baseIncome:150, canBuyMine:true, upgradeCost:8000 }, { id:'oil', title:'🛢 شرکت نفتی', desc:'درآمد پایه ۲۲۰/ماه — می‌توانید چاه نفت بخرید', baseIncome:220, canBuyMine:true, upgradeCost:12000 }, { id:'tech', title:'💻 شرکت فناوری', desc:'درآمد پایه ۱۰۰/ماه — قابل ارتقاء تا سطح بالا', baseIncome:100, canBuyMine:false, upgradeCost:6000 }, { id:'trade', title:'🚢 شرکت تجاری', desc:'درآمد پایه ۱۸۰/ماه — درآمد پایدار', baseIncome:180, canBuyMine:false, upgradeCost:9000 } ];
 
-/* ============================================================
-   نقشه نام انگلیسی → اطلاعات فارسی
-   ============================================================ */
-const COUNTRY_INFO = {
-  'Iran':           { name:'ایران', flag:'🇮🇷', bonus:'نفت +۲۰٪' },
-  'United States of America': { name:'آمریکا', flag:'🇺🇸', bonus:'صنعت +۲۵٪' },
-  'Germany':        { name:'آلمان', flag:'🇩🇪', bonus:'تکنولوژی +۳۰٪' },
-  'United Kingdom': { name:'انگلستان', flag:'🇬🇧', bonus:'تجارت +۲۰٪' },
-  'France':         { name:'فرانسه', flag:'🇫🇷', bonus:'کشاورزی +۲۰٪' },
-  'Russia':         { name:'روسیه', flag:'🇷🇺', bonus:'معدن +۲۵٪' },
-  'China':          { name:'چین', flag:'🇨🇳', bonus:'تولید +۳۰٪' },
-  'Japan':          { name:'ژاپن', flag:'🇯🇵', bonus:'تکنولوژی +۲۵٪' },
-  'India':          { name:'هند', flag:'🇮🇳', bonus:'نیروی کار +۲۰٪' },
-  'Brazil':         { name:'برزیل', flag:'🇧🇷', bonus:'کشاورزی +۲۵٪' },
-  'Canada':         { name:'کانادا', flag:'🇨🇦', bonus:'معدن +۲۰٪' },
-  'Australia':      { name:'استرالیا', flag:'🇦🇺', bonus:'معدن +۳۰٪' },
-  'Turkey':         { name:'ترکیه', flag:'🇹🇷', bonus:'تجارت +۱۵٪' },
-  'Egypt':          { name:'مصر', flag:'🇪🇬', bonus:'تجارت +۱۵٪' },
-  'Saudi Arabia':   { name:'عربستان', flag:'🇸🇦', bonus:'نفت +۳۰٪' },
-  'South Korea':    { name:'کره جنوبی', flag:'🇰🇷', bonus:'تکنولوژی +۲۵٪' },
-  'South Africa':   { name:'آفریقای جنوبی', flag:'🇿🇦', bonus:'معدن +۲۵٪' },
-  'Mexico':         { name:'مکزیک', flag:'🇲🇽', bonus:'نفت +۱۵٪' },
-  'Italy':          { name:'ایتالیا', flag:'🇮🇹', bonus:'تجارت +۱۵٪' },
-  'Spain':          { name:'اسپانیا', flag:'🇪🇸', bonus:'کشاورزی +۱۵٪' },
-  'Argentina':      { name:'آرژانتین', flag:'🇦🇷', bonus:'کشاورزی +۲۰٪' },
-  'Indonesia':      { name:'اندونزی', flag:'🇮🇩', bonus:'نیروی کار +۲۰٪' },
-  'Nigeria':        { name:'نیجریه', flag:'🇳🇬', bonus:'نفت +۲۰٪' },
-  'Pakistan':       { name:'پاکستان', flag:'🇵🇰', bonus:'نیروی کار +۱۵٪' },
-  'Iraq':           { name:'عراق', flag:'🇮🇶', bonus:'نفت +۲۵٪' },
-  'Afghanistan':    { name:'افغانستان', flag:'🇦🇫', bonus:'معدن +۱۵٪' },
-  'Netherlands':    { name:'هلند', flag:'🇳🇱', bonus:'تجارت +۲۰٪' },
-  'Poland':         { name:'لهستان', flag:'🇵🇱', bonus:'صنعت +۱۵٪' },
-  'Ukraine':        { name:'اوکراین', flag:'🇺🇦', bonus:'کشاورزی +۲۵٪' },
-  'Sweden':         { name:'سوئد', flag:'🇸🇪', bonus:'تکنولوژی +۲۰٪' },
-  'Norway':         { name:'نروژ', flag:'🇳🇴', bonus:'نفت +۲۰٪' },
-  'Vietnam':        { name:'ویتنام', flag:'🇻🇳', bonus:'نیروی کار +۲۰٪' },
-  'Thailand':       { name:'تایلند', flag:'🇹🇭', bonus:'تجارت +۱۵٪' },
-  'Malaysia':       { name:'مالزی', flag:'🇲🇾', bonus:'تجارت +۱۵٪' },
-  'Philippines':    { name:'فیلیپین', flag:'🇵🇭', bonus:'نیروی کار +۱۵٪' },
-  'Colombia':       { name:'کلمبیا', flag:'🇨🇴', bonus:'کشاورزی +۱۵٪' },
-  'Chile':          { name:'شیلی', flag:'🇨🇱', bonus:'معدن +۲۵٪' },
-  'Peru':           { name:'پرو', flag:'🇵🇪', bonus:'معدن +۲۰٪' },
-  'Venezuela':      { name:'ونزوئلا', flag:'🇻🇪', bonus:'نفت +۲۵٪' },
-  'Kazakhstan':     { name:'قزاقستان', flag:'🇰🇿', bonus:'معدن +۲۰٪' },
-  'Algeria':        { name:'الجزایر', flag:'🇩🇿', bonus:'نفت +۲۰٪' },
-  'Morocco':        { name:'مراکش', flag:'🇲🇦', bonus:'کشاورزی +۱۵٪' },
-  'Ethiopia':       { name:'اتیوپی', flag:'🇪🇹', bonus:'کشاورزی +۱۵٪' },
-  'Kenya':          { name:'کنیا', flag:'🇰🇪', bonus:'کشاورزی +۱۵٪' },
-  'Greece':         { name:'یونان', flag:'🇬🇷', bonus:'تجارت +۱۵٪' },
-  'Portugal':       { name:'پرتغال', flag:'🇵🇹', bonus:'تجارت +۱۵٪' },
-  'Belgium':        { name:'بلژیک', flag:'🇧🇪', bonus:'تجارت +۲۰٪' },
-  'Switzerland':    { name:'سوئیس', flag:'🇨🇭', bonus:'تکنولوژی +۲۵٪' },
-  'Austria':        { name:'اتریش', flag:'🇦🇹', bonus:'صنعت +۱۵٪' },
-  'Czechia':        { name:'چک', flag:'🇨🇿', bonus:'صنعت +۱۵٪' },
-  'Romania':        { name:'رومانی', flag:'🇷🇴', bonus:'کشاورزی +۱۵٪' },
-  'Hungary':        { name:'مجارستان', flag:'🇭🇺', bonus:'صنعت +۱۵٪' },
-  'Finland':        { name:'فنلاند', flag:'🇫🇮', bonus:'تکنولوژی +۲۰٪' },
-  'Denmark':        { name:'دانمارک', flag:'🇩🇰', bonus:'تجارت +۱۵٪' },
-  'Ireland':        { name:'ایرلند', flag:'🇮🇪', bonus:'تکنولوژی +۲۰٪' },
-  'New Zealand':    { name:'نیوزیلند', flag:'🇳🇿', bonus:'کشاورزی +۲۰٪' },
-  'Bangladesh':     { name:'بنگلادش', flag:'🇧🇩', bonus:'نیروی کار +۲۰٪' },
-  'Myanmar':        { name:'میانمار', flag:'🇲🇲', bonus:'کشاورزی +۱۵٪' },
-  'Sri Lanka':      { name:'سریلانکا', flag:'🇱🇰', bonus:'تجارت +۱۵٪' },
-  'Nepal':          { name:'نپال', flag:'🇳🇵', bonus:'کشاورزی +۱۵٪' },
-  'Uzbekistan':     { name:'ازبکستان', flag:'🇺🇿', bonus:'کشاورزی +۱۵٪' },
-  'Azerbaijan':     { name:'آذربایجان', flag:'🇦🇿', bonus:'نفت +۲۰٪' },
-  'Georgia':        { name:'گرجستان', flag:'🇬🇪', bonus:'تجارت +۱۵٪' },
-  'Armenia':        { name:'ارمنستان', flag:'🇦🇲', bonus:'تکنولوژی +۱۵٪' },
-  'Syria':          { name:'سوریه', flag:'🇸🇾', bonus:'کشاورزی +۱۵٪' },
-  'Jordan':         { name:'اردن', flag:'🇯🇴', bonus:'تجارت +۱۵٪' },
-  'Lebanon':        { name:'لبنان', flag:'🇱🇧', bonus:'تجارت +۱۵٪' },
-  'Israel':         { name:'اسرائیل', flag:'🇮🇱', bonus:'تکنولوژی +۲۵٪' },
-  'Kuwait':         { name:'کویت', flag:'🇰🇼', bonus:'نفت +۲۵٪' },
-  'Qatar':          { name:'قطر', flag:'🇶🇦', bonus:'نفت +۲۵٪' },
-  'United Arab Emirates': { name:'امارات', flag:'🇦🇪', bonus:'نفت +۲۵٪' },
-  'Oman':           { name:'عمان', flag:'🇴🇲', bonus:'نفت +۲۰٪' },
-  'Yemen':          { name:'یمن', flag:'🇾🇪', bonus:'نفت +۱۵٪' },
-};
+const state = { country:null, money:10000, company:null, assets:[], date:new Date(1836,0,1), speed:1, running:true, msPerMonth:2000, timeAccumulator:0, lastFrame:0, features:[], pathGen:null, projection:null, selectZoom:{scale:1,tx:0,ty:0}, gameZoom:{scale:1,tx:0,ty:0}, dragged:false, mapMode:'political', countryStats:{}, countryAreas:{}, countryTerrain:{}, countryMarkers:{} };
 
-/* ============================================================
-   انواع کمپانی
-   ============================================================ */
-const COMPANIES = [
-  { id:'mining', title:'⛏ شرکت معدنی',   desc:'درآمد پایه ۱۵۰/ماه — می‌توانید معدن بخرید', baseIncome:150, canBuyMine:true,  upgradeCost:8000 },
-  { id:'oil',    title:'🛢 شرکت نفتی',    desc:'درآمد پایه ۲۲۰/ماه — می‌توانید چاه نفت بخرید', baseIncome:220, canBuyMine:true,  upgradeCost:12000 },
-  { id:'tech',   title:'💻 شرکت فناوری',  desc:'درآمد پایه ۱۰۰/ماه — قابل ارتقاء تا سطح بالا', baseIncome:100, canBuyMine:false, upgradeCost:6000 },
-  { id:'trade',  title:'🚢 شرکت تجاری',   desc:'درآمد پایه ۱۸۰/ماه — درآمد پایدار', baseIncome:180, canBuyMine:false, upgradeCost:9000 },
-];
+function colorForCountry(name) { let hash=0; for(let i=0;i<name.length;i++){hash=((hash<<5)-hash)+name.charCodeAt(i);hash|=0;} const hue=Math.abs(hash)%360; return `hsl(${hue}, 35%, 28%)`; }
 
-/* ============================================================
-   وضعیت بازی
-   ============================================================ */
-const state = {
-  country: null,
-  money: 10000,
-  company: null,
-  assets: [],
-  date: new Date(1836, 0, 1),
-  speed: 1,
-  running: true,
-  msPerMonth: 2000,
-  timeAccumulator: 0,
-  lastFrame: 0,
-  countries: [], // { name, pathD, labelX, labelY, centerX, centerY, area }
-  zoom: { scale: 1, tx: 0, ty: 0 },
-};
-
-/* ============================================================
-   رنگ پایدار برای هر کشور (hash-based)
-   ============================================================ */
-function colorForCountry(name) {
-  let hash = 0;
-  for (let i = 0; i < name.length; i++) {
-    hash = ((hash << 5) - hash) + name.charCodeAt(i);
-    hash |= 0;
-  }
-  const hue = Math.abs(hash) % 360;
-  return `hsl(${hue}, 35%, 28%)`;
-}
-
-/* ============================================================
-   بارگذاری اسکریپت
-   ============================================================ */
-function loadScript(src) {
-  return new Promise((resolve, reject) => {
-    const s = document.createElement('script');
-    s.src = src;
-    s.onload = resolve;
-    s.onerror = reject;
-    document.head.appendChild(s);
-  });
-}
-
-/* ============================================================
-   تبدیل TopoJSON به مسیرهای SVG
-   ============================================================ */
 async function initMap() {
-  await loadScript(TOPO_URL);
-  const topo = await fetch(MAP_URL).then(r => r.json());
+  const topo = await fetch(MAP_URL).then(r=>r.json());
   const geo = topojson.feature(topo, topo.objects.countries);
+  const projection = d3.geoEquirectangular().fitSize([1000,500], geo);
+  state.projection = projection;
+  state.pathGen = d3.geoPath().projection(projection);
+  state.features = geo.features.filter(f => { const n = f.properties.name || ''; return n && n !== 'Antarctica'; });
 
-  const W = 1000, H = 500;
-  const project = (lon, lat) => [
-    (lon + 180) / 360 * W,
-    (90 - lat) / 180 * H
-  ];
-
-  const countries = [];
-
-  geo.features.forEach(f => {
-    const name = f.properties.name || '';
-    if (!name || name === 'Antarctica') return;
-
-    const geom = f.geometry;
-    if (!geom) return;
-
-    let d = '';
-    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-    let totalArea = 0;
-
-    const coords = geom.type === 'Polygon' ? [geom.coordinates] :
-                   geom.type === 'MultiPolygon' ? geom.coordinates : [];
-
-    coords.forEach(polygon => {
-      polygon.forEach((ring, ringIdx) => {
-        let ringArea = 0;
-        let px = 0, py = 0;
-        ring.forEach((pt, i) => {
-          const [x, y] = project(pt[0], pt[1]);
-          d += (i === 0 ? 'M' : 'L') + x.toFixed(1) + ',' + y.toFixed(1);
-          if (ringIdx === 0) {
-            if (x < minX) minX = x; if (y < minY) minY = y;
-            if (x > maxX) maxX = x; if (y > maxY) maxY = y;
-          }
-          px += x; py += y;
-        });
-        d += 'Z';
-        // محاسبه مساحت تقریبی (shoelace)
-        for (let i = 0; i < ring.length; i++) {
-          const [x1, y1] = project(ring[i][0], ring[i][1]);
-          const [x2, y2] = project(ring[(i+1) % ring.length][0], ring[(i+1) % ring.length][1]);
-          ringArea += x1 * y2 - x2 * y1;
-        }
-        totalArea += Math.abs(ringArea / 2);
-      });
-    });
-
-    if (!d) return;
-
-    // مرکز جرم تقریبی (bbox center) برای برچسب
-    const cx = (minX + maxX) / 2;
-    const cy = (minY + maxY) / 2;
-
-    countries.push({
-      name,
-      pathD: d,
-      centerX: cx,
-      centerY: cy,
-      area: totalArea,
-    });
+  state.features.forEach(f => {
+    const name = f.properties.name; if(!name) return;
+    let hash=0; for(let i=0;i<name.length;i++){hash=((hash<<5)-hash)+name.charCodeAt(i);hash|=0;} hash=Math.abs(hash);
+    state.countryStats[name] = { gdp: 1000+(hash%50000), industry: 1+(hash%10), population: 1+(hash%100) };
+    state.countryAreas[name] = d3.geoArea(f);
+    generateTerrainAndMarkers(name, f);
   });
 
-  state.countries = countries;
   renderSelectMap();
-  document.getElementById('loading').style.display = 'none';
-  document.getElementById('selectScreen').style.display = 'flex';
-  initZoomPan();
+  document.getElementById('loading').style.display='none';
+  document.getElementById('selectScreen').style.display='flex';
+  initSelectZoomPan();
 }
 
-/* ============================================================
-   رندر نقشه انتخاب
-   ============================================================ */
+/* ===== تولید زمین و نشانگرها برای هر کشور (شبیه HOI4) ===== */
+function generateTerrainAndMarkers(name, feature) {
+  const bounds = state.pathGen.bounds(feature);
+  const [x0,y0] = bounds[0]; const [x1,y1] = bounds[1];
+  const w = x1-x0; const h = y1-y0;
+  if (w<=0 || h<=0) return;
+
+  // --- زمین: کوهستان، جنگل ---
+  const mountains = []; const forests = [];
+  const numMountains = Math.floor(Math.random()*5)+1;
+  for(let i=0;i<numMountains;i++){
+    const cx = x0 + Math.random()*w; const cy = y0 + Math.random()*h;
+    const size = Math.min(w,h)*0.08 + Math.random()*Math.min(w,h)*0.05;
+    mountains.push({cx, cy, size});
+  }
+  const numForests = Math.floor(Math.random()*6)+2;
+  for(let i=0;i<numForests;i++){
+    const cx = x0 + Math.random()*w; const cy = y0 + Math.random()*h;
+    const r = Math.min(w,h)*0.04 + Math.random()*Math.min(w,h)*0.03;
+    forests.push({cx, cy, r});
+  }
+
+  // --- نشانگرها: پایتخت + شهرها + نقاط پیروزی ---
+  const centroid = state.pathGen.centroid(feature);
+  const markers = { capital: null, cities: [] };
+  if (centroid && isFinite(centroid[0]) && isFinite(centroid[1])) {
+    // پایتخت (ستاره) — در نزدیکی مرکز
+    markers.capital = { x: centroid[0], y: centroid[1], name: name + ' City' };
+    // شهرهای دیگر
+    const numCities = Math.floor(Math.random()*4)+2;
+    for(let i=0;i<numCities;i++){
+      const angle = Math.random()*Math.PI*2;
+      const dist = Math.min(w,h)*0.2 + Math.random()*Math.min(w,h)*0.3;
+      const cx = centroid[0] + Math.cos(angle)*dist;
+      const cy = centroid[1] + Math.sin(angle)*dist*0.6;
+      // نقاط پیروزی (مربع/پنج‌ضلعی/دایره) — در HOI4 بر اساس ارزش [citation:1][citation:3]
+      const vpType = Math.random() < 0.2 ? 'circle' : (Math.random() < 0.4 ? 'pentagon' : 'square');
+      markers.cities.push({ x: cx, y: cy, vpType, name: name + ' ' + (i+1) });
+    }
+  }
+
+  state.countryTerrain[name] = { mountains, forests };
+  state.countryMarkers[name] = markers;
+}
+
+/* ===== رسم نقشه انتخاب ===== */
 function renderSelectMap() {
-  const layer = document.getElementById('countriesLayer');
-  layer.innerHTML = '';
-  const tooltip = document.getElementById('tooltip');
-  const container = document.getElementById('mapContainer');
+  const layer = document.getElementById('countriesLayer'); layer.innerHTML = '';
+  const tooltip = document.getElementById('tooltip'); const container = document.getElementById('mapContainer');
+  const maxArea = Math.max(...Object.values(state.countryAreas).filter(a=>isFinite(a)));
 
-  // پیدا کردن بزرگ‌ترین مساحت برای تعیین برچسب‌ها
-  const maxArea = Math.max(...state.countries.map(c => c.area));
-
-  state.countries.forEach(c => {
-    const info = COUNTRY_INFO[c.name];
-    const p = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-    p.setAttribute('d', c.pathD);
-    p.setAttribute('class', 'countryHit' + (info ? ' selectable' : ''));
-    p.setAttribute('fill', info ? colorForCountry(c.name) : '#1a2634');
-    p.dataset.name = c.name;
-
-    if (info) {
-      p.addEventListener('mouseenter', () => {
-        tooltip.style.display = 'block';
-        tooltip.textContent = `${info.flag} ${info.name} — ${info.bonus}`;
-      });
-      p.addEventListener('mousemove', e => {
-        const rect = container.getBoundingClientRect();
-        tooltip.style.left = (e.clientX - rect.left + 14) + 'px';
-        tooltip.style.top  = (e.clientY - rect.top  + 14) + 'px';
-      });
-      p.addEventListener('mouseleave', () => tooltip.style.display = 'none');
-      p.addEventListener('click', e => {
-        e.stopPropagation();
-        if (state.dragged) return; // جلوگیری از کلیک بعد از درگ
-        selectCountry(c.name);
-      });
+  state.features.forEach(f => {
+    const name = f.properties.name; const info = COUNTRY_INFO[name]; const d = state.pathGen(f); if(!d) return;
+    const p = document.createElementNS('http://www.w3.org/2000/svg','path');
+    p.setAttribute('d', d); p.setAttribute('class','country-base');
+    p.setAttribute('fill', info ? colorForCountry(name) : '#1a2634');
+    p.dataset.name = name;
+    if(info){
+      const stats = state.countryStats[name] || {gdp:0,industry:1};
+      p.addEventListener('mouseenter', ()=>{ tooltip.style.display='block'; tooltip.innerHTML=`<div class="t-title">${info.flag} ${info.name} (${name})</div><div class="t-row"><span>حکومت</span><span>${info.gov||'—'}</span></div><div class="t-row"><span>بونوس</span><span>${info.bonus}</span></div><div class="t-row"><span>GDP</span><span>${stats.gdp.toLocaleString('en-US')}</span></div>`; });
+      p.addEventListener('mousemove', e=>{ const rect=container.getBoundingClientRect(); tooltip.style.left=(e.clientX-rect.left+16)+'px'; tooltip.style.top=(e.clientY-rect.top+16)+'px'; });
+      p.addEventListener('mouseleave', ()=>tooltip.style.display='none');
+      p.addEventListener('click', e=>{ e.stopPropagation(); if(state.dragged)return; selectCountry(name); });
     }
     layer.appendChild(p);
+    if(info){
+      const centroid = state.pathGen.centroid(f); const area = state.countryAreas[name]||0;
+      if(centroid && isFinite(centroid[0]) && isFinite(centroid[1]) && isFinite(area)){
+        const text = document.createElementNS('http://www.w3.org/2000/svg','text');
+        text.setAttribute('x', centroid[0]); text.setAttribute('y', centroid[1]);
+        const fontSize = Math.max(1.5, Math.min(8, Math.sqrt(area)*60));
+        text.setAttribute('font-size', fontSize); text.setAttribute('class','country-label'); text.textContent = name;
+        layer.appendChild(text);
+      }
+    }
+  });
+  updateSelectVisibility();
+}
+
+/* ===== رسم زمین و نشانگرها ===== */
+function renderSelectTerrain() {
+  const terrainG = document.getElementById('terrainLayerSelect'); terrainG.innerHTML='';
+  const markerG = document.getElementById('markerLayerSelect'); markerG.innerHTML='';
+  const scale = state.selectZoom.scale;
+  if (scale < 2) return; // فقط با زوم کافی
+
+  const inv = 1/scale;
+  Object.entries(state.countryTerrain).forEach(([name, terrain]) => {
+    if(!COUNTRY_INFO[name]) return;
+    terrain.mountains.forEach(m => {
+      const poly = document.createElementNS('http://www.w3.org/2000/svg','polygon');
+      const s = m.size * inv * 3; // اندازه معکوس تا ثابت بماند
+      poly.setAttribute('points', `${m.cx},${m.cy - s} ${m.cx - s*1.2},${m.cy + s} ${m.cx + s*1.2},${m.cy + s}`);
+      poly.setAttribute('class','mountain'); poly.setAttribute('stroke-width', 0.5*inv);
+      terrainG.appendChild(poly);
+    });
+    terrain.forests.forEach(f => {
+      const circle = document.createElementNS('http://www.w3.org/2000/svg','circle');
+      circle.setAttribute('cx', f.cx); circle.setAttribute('cy', f.cy); circle.setAttribute('r', f.r*inv*3);
+      circle.setAttribute('class','forest'); terrainG.appendChild(circle);
+    });
   });
 
-  // برچسب‌ها روی کشورهای شناخته‌شده با مساحت کافی
-  state.countries.forEach(c => {
-    const info = COUNTRY_INFO[c.name];
-    if (!info) return;
-    if (c.area < maxArea * 0.003) return; // خیلی کوچک
-
-    const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
-    text.setAttribute('x', c.centerX);
-    text.setAttribute('y', c.centerY);
-    text.setAttribute('class', 'countryLabel');
-    text.textContent = info.name;
-    layer.appendChild(text);
+  Object.entries(state.countryMarkers).forEach(([name, m]) => {
+    if(!COUNTRY_INFO[name]) return;
+    // پایتخت: ستاره
+    if (m.capital) {
+      const star = document.createElementNS('http://www.w3.org/2000/svg','polygon');
+      const r = 3 * inv * 3; const cx = m.capital.x; const cy = m.capital.y;
+      const pts = []; for(let i=0;i<10;i++){ const ang = Math.PI/2 + i*Math.PI/5; const rad = i%2===0?r:r*0.4; pts.push(`${cx+Math.cos(ang)*rad},${cy+Math.sin(ang)*rad}`); }
+      star.setAttribute('points', pts.join(' ')); star.setAttribute('class','capital-star'); star.setAttribute('stroke-width', 0.3*inv);
+      markerG.appendChild(star);
+    }
+    // شهرها: دایره/پنج‌ضلعی/مربع
+    m.cities.forEach(c => {
+      if (c.vpType === 'circle') {
+        const el = document.createElementNS('http://www.w3.org/2000/svg','circle');
+        el.setAttribute('cx', c.x); el.setAttribute('cy', c.y); el.setAttribute('r', 1.5*inv*3);
+        el.setAttribute('class','vp-circle'); el.setAttribute('stroke-width', 0.3*inv); markerG.appendChild(el);
+      } else if (c.vpType === 'pentagon') {
+        const el = document.createElementNS('http://www.w3.org/2000/svg','polygon');
+        const s = 2*inv*3; const pts=[]; for(let i=0;i<5;i++){ const ang=-Math.PI/2 + i*2*Math.PI/5; pts.push(`${c.x+Math.cos(ang)*s},${c.y+Math.sin(ang)*s}`); }
+        el.setAttribute('points', pts.join(' ')); el.setAttribute('class','vp-pentagon'); el.setAttribute('stroke-width', 0.3*inv); markerG.appendChild(el);
+      } else {
+        const el = document.createElementNS('http://www.w3.org/2000/svg','rect');
+        const s = 2*inv*3; el.setAttribute('x', c.x-s/2); el.setAttribute('y', c.y-s/2); el.setAttribute('width', s); el.setAttribute('height', s);
+        el.setAttribute('class','vp-square'); el.setAttribute('stroke-width', 0.3*inv); markerG.appendChild(el);
+      }
+    });
   });
-
-  // نمایش برچسب‌ها وقتی زوم کافی شد
-  updateLabelVisibility();
 }
 
-function updateLabelVisibility() {
-  const labels = document.querySelectorAll('.countryLabel');
-  const show = state.zoom.scale > 1.3;
-  labels.forEach(l => l.classList.toggle('visible', show));
+function updateSelectVisibility() {
+  const showLabel = state.selectZoom.scale > 1.2;
+  document.querySelectorAll('.country-label').forEach(l => l.classList.toggle('visible', showLabel));
+  const terrainG = document.getElementById('terrainLayerSelect'); const markerG = document.getElementById('markerLayerSelect');
+  if (state.selectZoom.scale >= 2) { terrainG.classList.add('visible'); markerG.classList.add('visible'); } else { terrainG.classList.remove('visible'); markerG.classList.remove('visible'); }
 }
 
-/* ============================================================
-   زوم و پن با ماوس
-   ============================================================ */
-let isDragging = false;
-let dragStart = { x:0, y:0, tx:0, ty:0 };
-
-function applyTransform() {
-  const g = document.getElementById('countriesLayer');
-  if (!g) return;
-  g.setAttribute('transform',
-    `translate(${state.zoom.tx}, ${state.zoom.ty}) scale(${state.zoom.scale})`);
-  updateLabelVisibility();
-}
-
-function initZoomPan() {
-  const container = document.getElementById('mapContainer');
-  const svg = document.getElementById('worldMap');
-
-  // زوم با wheel
+function initSelectZoomPan() {
+  const container = document.getElementById('mapContainer'); const svg = document.getElementById('worldMap');
   container.addEventListener('wheel', e => {
     e.preventDefault();
-    const rect = container.getBoundingClientRect();
-    const mx = e.clientX - rect.left;
-    const my = e.clientY - rect.top;
-    // مختصات در viewBox
-    const vb = svg.viewBox.baseVal;
-    const px = mx / rect.width * vb.width;
-    const py = my / rect.height * vb.height;
+    const rect = container.getBoundingClientRect(); const mx = e.clientX-rect.left; const my = e.clientY-rect.top;
+    const vb = svg.viewBox.baseVal; const px = mx/rect.width*vb.width; const py = my/rect.height*vb.height;
+    const delta = e.deltaY<0?1.15:1/1.15; const newScale = Math.max(0.5, Math.min(20, state.selectZoom.scale*delta)); const ratio = newScale/state.selectZoom.scale;
+    state.selectZoom.tx = px-(px-state.selectZoom.tx)*ratio; state.selectZoom.ty = py-(py-state.selectZoom.ty)*ratio; state.selectZoom.scale = newScale;
+    applySelectTransform(); renderSelectTerrain();
+  }, {passive:false});
 
-    const delta = e.deltaY < 0 ? 1.15 : 1 / 1.15;
-    const newScale = Math.max(0.5, Math.min(15, state.zoom.scale * delta));
-    const ratio = newScale / state.zoom.scale;
-
-    // زوم حول نقطه ماوس
-    state.zoom.tx = px - (px - state.zoom.tx) * ratio;
-    state.zoom.ty = py - (py - state.zoom.ty) * ratio;
-    state.zoom.scale = newScale;
-
-    applyTransform();
-  }, { passive: false });
-
-  // درگ با ماوس
-  container.addEventListener('mousedown', e => {
-    if (e.button !== 0) return;
-    isDragging = true;
-    state.dragged = false;
-    container.classList.add('dragging');
-    dragStart = {
-      x: e.clientX,
-      y: e.clientY,
-      tx: state.zoom.tx,
-      ty: state.zoom.ty,
-    };
-  });
-
-  window.addEventListener('mousemove', e => {
-    if (!isDragging) return;
-    const dx = e.clientX - dragStart.x;
-    const dy = e.clientY - dragStart.y;
-    if (Math.abs(dx) > 3 || Math.abs(dy) > 3) state.dragged = true;
-
-    const rect = container.getBoundingClientRect();
-    const vb = svg.viewBox.baseVal;
-    const sx = vb.width / rect.width;
-    const sy = vb.height / rect.height;
-
-    state.zoom.tx = dragStart.tx + dx * sx;
-    state.zoom.ty = dragStart.ty + dy * sy;
-    applyTransform();
-  });
-
-  window.addEventListener('mouseup', () => {
-    if (!isDragging) return;
-    isDragging = false;
-    container.classList.remove('dragging');
-    // تأخیر کوتاه تا کلیک بعد از درگ نادیده گرفته شود
-    setTimeout(() => { state.dragged = false; }, 50);
-  });
-
-  // دکمه‌های زوم
-  document.getElementById('zoomIn').onclick = () => zoomAt(1.3);
-  document.getElementById('zoomOut').onclick = () => zoomAt(1/1.3);
-  document.getElementById('zoomReset').onclick = () => {
-    state.zoom = { scale: 1, tx: 0, ty: 0 };
-    applyTransform();
-  };
+  let isDragging=false; let dragStart={x:0,y:0,tx:0,ty:0};
+  container.addEventListener('mousedown', e=>{ if(e.button!==0)return; isDragging=true; state.dragged=false; container.classList.add('dragging'); dragStart={x:e.clientX,y:e.clientY,tx:state.selectZoom.tx,ty:state.selectZoom.ty}; });
+  window.addEventListener('mousemove', e=>{ if(!isDragging)return; const dx=e.clientX-dragStart.x; const dy=e.clientY-dragStart.y; if(Math.abs(dx)>3||Math.abs(dy)>3)state.dragged=true; const rect=container.getBoundingClientRect(); const vb=svg.viewBox.baseVal; const sx=vb.width/rect.width; const sy=vb.height/rect.height; state.selectZoom.tx=dragStart.tx+dx*sx; state.selectZoom.ty=dragStart.ty+dy*sy; applySelectTransform(); });
+  window.addEventListener('mouseup', ()=>{ if(!isDragging)return; isDragging=false; container.classList.remove('dragging'); setTimeout(()=>state.dragged=false,50); });
+  document.getElementById('zoomIn').onclick=()=>zoomSelectAt(1.3);
+  document.getElementById('zoomOut').onclick=()=>zoomSelectAt(1/1.3);
+  document.getElementById('zoomReset').onclick=()=>{ state.selectZoom={scale:1,tx:0,ty:0}; applySelectTransform(); renderSelectTerrain(); };
 }
 
-function zoomAt(factor) {
-  const svg = document.getElementById('worldMap');
-  const vb = svg.viewBox.baseVal;
-  const cx = vb.width / 2;
-  const cy = vb.height / 2;
-  const newScale = Math.max(0.5, Math.min(15, state.zoom.scale * factor));
-  const ratio = newScale / state.zoom.scale;
-
-  state.zoom.tx = cx - (cx - state.zoom.tx) * ratio;
-  state.zoom.ty = cy - (cy - state.zoom.ty) * ratio;
-  state.zoom.scale = newScale;
-  applyTransform();
+function applySelectTransform() {
+  const g = document.getElementById('countriesLayer'); const tG = document.getElementById('terrainLayerSelect'); const mG = document.getElementById('markerLayerSelect');
+  const t = `translate(${state.selectZoom.tx}, ${state.selectZoom.ty}) scale(${state.selectZoom.scale})`;
+  [g,tG,mG].forEach(el=>{ if(el) el.setAttribute('transform', t); });
+  updateSelectVisibility();
 }
+function zoomSelectAt(factor){ const svg=document.getElementById('worldMap'); const vb=svg.viewBox.baseVal; const cx=vb.width/2; const cy=vb.height/2; const newScale=Math.max(0.5,Math.min(20,state.selectZoom.scale*factor)); const ratio=newScale/state.selectZoom.scale; state.selectZoom.tx=cx-(cx-state.selectZoom.tx)*ratio; state.selectZoom.ty=cy-(cy-state.selectZoom.ty)*ratio; state.selectZoom.scale=newScale; applySelectTransform(); renderSelectTerrain(); }
 
-/* ============================================================
-   انتخاب کشور
-   ============================================================ */
+/* ===== انتخاب کشور و شروع بازی ===== */
 function selectCountry(name) {
-  const info = COUNTRY_INFO[name];
-  if (!info) return;
+  const info = COUNTRY_INFO[name]; if(!info) return;
+  state.country = {name, ...info};
+  document.getElementById('flagIcon').textContent = info.flag; document.getElementById('flagName').textContent = info.name; document.getElementById('flagBonus').textContent = info.bonus;
+  renderGameMap(); initGameZoomPan();
+  const ss = document.getElementById('selectScreen'); ss.style.opacity='0';
+  setTimeout(()=>{ ss.style.display='none'; document.getElementById('game').style.display='block'; updateUI(); state.lastFrame=performance.now(); requestAnimationFrame(gameLoop); }, 500);
+}
 
-  state.country = { name, ...info };
-
-  document.getElementById('flagIcon').textContent = info.flag;
-  document.getElementById('flagName').textContent = info.name;
-  document.getElementById('flagBonus').textContent = info.bonus;
-
-  // رندر نقشه بازی
-  const gameLayer = document.getElementById('gameCountriesLayer');
-  gameLayer.innerHTML = '';
-  const maxArea = Math.max(...state.countries.map(c => c.area));
-  state.countries.forEach(c => {
-    const p = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-    p.setAttribute('d', c.pathD);
-    p.setAttribute('class', 'gameCountry' + (c.name === name ? ' home' : ''));
-    p.setAttribute('fill', c.name === name ? '#ffd54f' : colorForCountry(c.name));
-    gameLayer.appendChild(p);
+function renderGameMap() {
+  const countryLayer = document.getElementById('gameCountriesLayer'); const terrainG = document.getElementById('terrainLayerGame'); const markerG = document.getElementById('markerLayerGame');
+  countryLayer.innerHTML=''; terrainG.innerHTML=''; markerG.innerHTML='';
+  state.features.forEach(f => {
+    const fname = f.properties.name; const d = state.pathGen(f); if(!d) return;
+    const p = document.createElementNS('http://www.w3.org/2000/svg','path');
+    p.setAttribute('d', d); p.setAttribute('class','gameCountry' + (fname===state.country.name?' home':''));
+    p.setAttribute('fill', getCountryFill(fname)); countryLayer.appendChild(p);
   });
-
-  const ss = document.getElementById('selectScreen');
-  ss.style.opacity = '0';
-  setTimeout(() => {
-    ss.style.display = 'none';
-    document.getElementById('game').style.display = 'block';
-    updateUI();
-    state.lastFrame = performance.now();
-    requestAnimationFrame(gameLoop);
-  }, 500);
+  renderGameTerrainAndMarkers();
+  applyGameTransform();
 }
 
-/* ============================================================
-   بقیه منطق بازی (بدون تغییر)
-   ============================================================ */
-const modal = document.getElementById('modal');
-const modalBox = document.getElementById('modalBox');
-function openModal(html) { modalBox.innerHTML = html; modal.style.display = 'flex'; }
-function closeModal() { modal.style.display = 'none'; }
-modal.onclick = e => { if (e.target === modal) closeModal(); };
+function renderGameTerrainAndMarkers() {
+  const terrainG = document.getElementById('terrainLayerGame'); const markerG = document.getElementById('markerLayerGame');
+  terrainG.innerHTML=''; markerG.innerHTML='';
+  if (state.gameZoom.scale < 2) { terrainG.classList.remove('visible'); markerG.classList.remove('visible'); return; }
+  terrainG.classList.add('visible'); markerG.classList.add('visible');
+  const inv = 1/state.gameZoom.scale;
 
-document.getElementById('buildCompanyBtn').onclick = () => {
-  if (state.company) { toast('شما قبلاً کمپانی دارید!', true); return; }
-  let html = `<h2>🏗 انتخاب نوع کمپانی</h2>`;
-  COMPANIES.forEach(c => {
-    html += `<div class="companyOption" onclick="createCompany('${c.id}')">
-      <div class="title">${c.title}</div>
-      <div class="desc">${c.desc}</div>
-    </div>`;
-  });
-  html += `<button class="close" onclick="closeModal()">انصراف</button>`;
-  openModal(html);
-};
-
-function createCompany(id) {
-  const def = COMPANIES.find(c => c.id === id);
-  state.company = { ...def, level: 1 };
-  closeModal();
-
-  document.getElementById('buildCompanyBtn').disabled = true;
-  document.getElementById('assetsToggleBtn').disabled = false;
-  document.getElementById('upgradeBtn').disabled = false;
-
-  if (def.canBuyMine) {
-    document.getElementById('buyMineBtn').disabled = false;
-    document.getElementById('buyMineBtn').textContent =
-      def.id === 'oil' ? '🛢 خرید چاه نفت (۵,۰۰۰)' : '⛏ خرید معدن (۵,۰۰۰)';
-  } else {
-    document.getElementById('buyMineBtn').disabled = true;
-    document.getElementById('buyMineBtn').textContent = '⛏ خرید معدن (نیاز به شرکت معدنی)';
-  }
-
-  toast(`کمپانی ${def.title} ساخته شد!`);
-  updateUI();
-}
-
-const MINE_COST = 5000;
-document.getElementById('buyMineBtn').onclick = () => {
-  if (!state.company || !state.company.canBuyMine) {
-    toast('فقط شرکت معدنی/نفتی می‌تواند معدن بخرد', true); return;
-  }
-  if (state.money < MINE_COST) { toast('پول کافی ندارید!', true); return; }
-  state.money -= MINE_COST;
-  const income = Math.floor(80 + Math.random() * 120);
-  const label = state.company.id === 'oil' ? 'چاه نفت' : 'معدن';
-  state.assets.push({ income, type: label, id: Date.now() });
-  toast(`${label} جدید خریداری شد! (+${income}/ماه)`);
-  updateUI();
-};
-
-document.getElementById('upgradeBtn').onclick = () => {
-  if (!state.company) return;
-  const cost = state.company.upgradeCost * state.company.level;
-  if (state.money < cost) { toast(`پول کافی ندارید! نیاز: ${cost.toLocaleString('en-US')}`, true); return; }
-  state.money -= cost;
-  state.company.level += 1;
-  toast(`کمپانی به سطح ${state.company.level} ارتقاء یافت!`);
-  updateUI();
-};
-
-document.getElementById('assetsToggleBtn').onclick = () => {
-  const p = document.getElementById('assetsPanel');
-  p.style.display = p.style.display === 'block' ? 'none' : 'block';
-  renderAssets();
-};
-
-function renderAssets() {
-  const list = document.getElementById('assetsList');
-  if (state.assets.length === 0) {
-    list.innerHTML = `<div class="empty">هنوز دارایی‌ای ندارید.</div>`; return;
-  }
-  list.innerHTML = state.assets.map((a, i) =>
-    `<div class="assetItem"><span>${a.type} #${i+1}</span><span class="income">+${a.income}/ماه</span></div>`
-  ).join('');
-}
-
-document.querySelectorAll('.speedBtn').forEach(btn => {
-  btn.onclick = () => {
-    const s = parseInt(btn.dataset.speed);
-    if (s === 0) {
-      state.running = !state.running;
-      btn.classList.toggle('active', !state.running);
-      btn.textContent = state.running ? '⏸' : '▶';
-      return;
-    }
-    state.speed = s;
-    state.running = true;
-    document.querySelector('[data-speed="0"]').textContent = '⏸';
-    document.querySelector('[data-speed="0"]').classList.remove('active');
-    document.querySelectorAll('.speedBtn').forEach(b => {
-      if (b.dataset.speed !== '0') b.classList.remove('active');
+  Object.entries(state.countryTerrain).forEach(([name, terrain]) => {
+    if(!COUNTRY_INFO[name]) return;
+    if(state.mapMode !== 'political' && name !== state.country.name) return; // در حالت‌های دیگر فقط کشور خودت
+    terrain.mountains.forEach(m => {
+      const poly = document.createElementNS('http://www.w3.org/2000/svg','polygon');
+      const s = m.size*inv*3; poly.setAttribute('points', `${m.cx},${m.cy-s} ${m.cx-s*1.2},${m.cy+s} ${m.cx+s*1.2},${m.cy+s}`);
+      poly.setAttribute('class','mountain'); poly.setAttribute('stroke-width',0.5*inv); terrainG.appendChild(poly);
     });
-    btn.classList.add('active');
-    state.timeAccumulator = 0;
-  };
-});
+    terrain.forests.forEach(f => {
+      const circle = document.createElementNS('http://www.w3.org/2000/svg','circle');
+      circle.setAttribute('cx',f.cx); circle.setAttribute('cy',f.cy); circle.setAttribute('r',f.r*inv*3); circle.setAttribute('class','forest'); terrainG.appendChild(circle);
+    });
+  });
 
-function gameLoop(now) {
-  const dt = now - state.lastFrame;
-  state.lastFrame = now;
-  if (state.running) {
-    state.timeAccumulator += dt * state.speed;
-    while (state.timeAccumulator >= state.msPerMonth) {
-      state.timeAccumulator -= state.msPerMonth;
-      advanceMonth();
+  Object.entries(state.countryMarkers).forEach(([name, m]) => {
+    if(!COUNTRY_INFO[name]) return;
+    if(state.mapMode !== 'political' && name !== state.country.name) return;
+    if (m.capital) {
+      const star = document.createElementNS('http://www.w3.org/2000/svg','polygon');
+      const r = 3*inv*3; const cx=m.capital.x; const cy=m.capital.y; const pts=[];
+      for(let i=0;i<10;i++){ const ang=Math.PI/2+i*Math.PI/5; const rad=i%2===0?r:r*0.4; pts.push(`${cx+Math.cos(ang)*rad},${cy+Math.sin(ang)*rad}`); }
+      star.setAttribute('points',pts.join(' ')); star.setAttribute('class','capital-star'); star.setAttribute('stroke-width',0.3*inv); markerG.appendChild(star);
     }
-  }
-  requestAnimationFrame(gameLoop);
+    m.cities.forEach(c => {
+      if(c.vpType==='circle'){ const el=document.createElementNS('http://www.w3.org/2000/svg','circle'); el.setAttribute('cx',c.x); el.setAttribute('cy',c.y); el.setAttribute('r',1.5*inv*3); el.setAttribute('class','vp-circle'); el.setAttribute('stroke-width',0.3*inv); markerG.appendChild(el); }
+      else if(c.vpType==='pentagon'){ const el=document.createElementNS('http://www.w3.org/2000/svg','polygon'); const s=2*inv*3; const pts=[]; for(let i=0;i<5;i++){ const ang=-Math.PI/2+i*2*Math.PI/5; pts.push(`${c.x+Math.cos(ang)*s},${c.y+Math.sin(ang)*s}`); } el.setAttribute('points',pts.join(' ')); el.setAttribute('class','vp-pentagon'); el.setAttribute('stroke-width',0.3*inv); markerG.appendChild(el); }
+      else { const el=document.createElementNS('http://www.w3.org/2000/svg','rect'); const s=2*inv*3; el.setAttribute('x',c.x-s/2); el.setAttribute('y',c.y-s/2); el.setAttribute('width',s); el.setAttribute('height',s); el.setAttribute('class','vp-square'); el.setAttribute('stroke-width',0.3*inv); markerG.appendChild(el); }
+    });
+  });
 }
 
-function advanceMonth() {
-  state.date.setMonth(state.date.getMonth() + 1);
-  let income = 0;
-  if (state.company) {
-    income += state.company.baseIncome * state.company.level;
-    state.assets.forEach(a => income += a.income);
-  }
-  if (income > 0) {
-    state.money += income;
-    flashMoney();
-  }
-  const dateEl = document.getElementById('dateDisplay');
-  dateEl.classList.add('tick');
-  setTimeout(() => dateEl.classList.remove('tick'), 200);
-  updateUI();
+function initGameZoomPan() {
+  const container = document.getElementById('gameMap'); const svg = document.getElementById('gameSvg');
+  const newContainer = container.cloneNode(true); container.parentNode.replaceChild(newContainer, container); const c = document.getElementById('gameMap');
+  c.addEventListener('wheel', e => {
+    e.preventDefault(); const rect=c.getBoundingClientRect(); const mx=e.clientX-rect.left; const my=e.clientY-rect.top;
+    const vb=svg.viewBox.baseVal; const px=mx/rect.width*vb.width; const py=my/rect.height*vb.height;
+    const delta=e.deltaY<0?1.15:1/1.15; const newScale=Math.max(0.8,Math.min(25,state.gameZoom.scale*delta)); const ratio=newScale/state.gameZoom.scale;
+    state.gameZoom.tx=px-(px-state.gameZoom.tx)*ratio; state.gameZoom.ty=py-(py-state.gameZoom.ty)*ratio; state.gameZoom.scale=newScale;
+    applyGameTransform(); renderGameTerrainAndMarkers();
+  }, {passive:false});
+  let isDragging=false; let dragStart={x:0,y:0,tx:0,ty:0};
+  c.addEventListener('mousedown', e=>{ if(e.button!==0)return; isDragging=true; state.dragged=false; c.classList.add('dragging'); dragStart={x:e.clientX,y:e.clientY,tx:state.gameZoom.tx,ty:state.gameZoom.ty}; });
+  window.addEventListener('mousemove', e=>{ if(!isDragging)return; const dx=e.clientX-dragStart.x; const dy=e.clientY-dragStart.y; if(Math.abs(dx)>3||Math.abs(dy)>3)state.dragged=true; const rect=c.getBoundingClientRect(); const vb=svg.viewBox.baseVal; const sx=vb.width/rect.width; const sy=vb.height/rect.height; state.gameZoom.tx=dragStart.tx+dx*sx; state.gameZoom.ty=dragStart.ty+dy*sy; applyGameTransform(); });
+  window.addEventListener('mouseup', ()=>{ if(!isDragging)return; isDragging=false; c.classList.remove('dragging'); setTimeout(()=>state.dragged=false,50); });
 }
 
-function flashMoney() {
-  const el = document.getElementById('money');
-  el.classList.add('flash');
-  setTimeout(() => el.classList.remove('flash'), 300);
+function applyGameTransform() {
+  const cl=document.getElementById('gameCountriesLayer'); const tl=document.getElementById('terrainLayerGame'); const ml=document.getElementById('markerLayerGame');
+  const t=`translate(${state.gameZoom.tx}, ${state.gameZoom.ty}) scale(${state.gameZoom.scale})`;
+  [cl,tl,ml].forEach(el=>{if(el)el.setAttribute('transform',t);});
 }
 
-const monthsFa = ['ژانویه','فوریه','مارس','آپریل','مه','ژوئن','ژوئیه','اوت','سپتامبر','اکتبر','نوامبر','دسامبر'];
-const toFa = n => n.toString().replace(/\d/g, d => '۰۱۲۳۴۵۶۷۸۹'[d]);
+function getCountryFill(name) { const mode=state.mapMode; const stats=state.countryStats[name]||{gdp:0,industry:1}; if(mode==='political')return COUNTRY_INFO[name]?colorForCountry(name):'#1a2634'; if(mode==='wealth'){const ratio=Math.min(1,stats.gdp/50000); return `rgb(${Math.floor(30+(1-ratio)*150)}, ${Math.floor(30+ratio*180)}, ${Math.floor(30+ratio*80)})`;} if(mode==='industry'){const ratio=Math.min(1,stats.industry/10); return `rgb(${Math.floor(40+ratio*200)}, ${Math.floor(40+ratio*100)}, ${Math.floor(40+ratio*30)})`;} return colorForCountry(name); }
 
-function updateUI() {
-  document.getElementById('money').textContent = toFa(state.money.toLocaleString('en-US'));
-  document.getElementById('companyName').textContent = state.company ? state.company.title : '—';
-  document.getElementById('assetCount').textContent = toFa(state.assets.length);
-  let income = 0;
-  if (state.company) {
-    income += state.company.baseIncome * state.company.level;
-    state.assets.forEach(a => income += a.income);
-  }
-  document.getElementById('income').textContent = toFa(income.toLocaleString('en-US'));
-  const d = state.date;
-  document.getElementById('dateDisplay').textContent =
-    `${toFa(d.getDate())} ${monthsFa[d.getMonth()]} ${toFa(d.getFullYear())}`;
-  if (state.company) {
-    const cost = state.company.upgradeCost * state.company.level;
-    document.getElementById('upgradeBtn').textContent =
-      `⬆ ارتقاء (${toFa(cost.toLocaleString('en-US'))})`;
-  }
-}
-
-let toastTimer;
-function toast(msg, isError = false) {
-  const t = document.getElementById('toast');
-  t.textContent = msg;
-  t.classList.toggle('error', isError);
-  t.classList.add('show');
-  clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => t.classList.remove('show'), 2500);
-}
-
-document.addEventListener('keydown', e => {
-  if (document.getElementById('game').style.display !== 'block') return;
-  if (e.code === 'Space') { e.preventDefault(); document.querySelector('[data-speed="0"]').click(); }
-  if (e.key === '1') document.querySelector('[data-speed="1"]').click();
-  if (e.key === '2') document.querySelector('[data-speed="2"]').click();
-  if (e.key === '3') document.querySelector('[data-speed="4"]').click();
-  if (e.key === '4') document.querySelector('[data-speed="8"]').click();
-});
-
-window.createCompany = createCompany;
-window.closeModal = closeModal;
-
-initMap().catch(err => {
-  document.getElementById('loading').innerHTML =
-    `<p style="color:#ef5350">خطا: ${err.message}</p>
-     <p style="color:#90a4ae;font-size:.8rem">اتصال اینترنت را بررسی کنید</p>`;
-});
+/* ===== بقیه منطق بازی (بدون تغییر) ===== */
+document.querySelectorAll('.modeBtn').forEach(btn=>{ btn.onclick=()=>{ document.querySelectorAll('.modeBtn').forEach(b=>b.classList.remove('active')); btn.classList.add('active'); state.mapMode=btn.dataset.mode; renderGameMap(); toast(`حالت نقشه: ${btn.textContent.trim()}`); }; });
+const modal=document.getElementById('modal'); const modalBox=document.getElementById('modalBox'); function openModal(html){modalBox.innerHTML=html;modal.style.display='flex';} function closeModal(){modal.style.display='none';} modal.onclick=e=>{if(e.target===modal)closeModal();};
+document.getElementById('buildCompanyBtn').onclick=()=>{ if(state.company){toast('شما قبلاً کمپانی دارید!',true);return;} let html=`<h2>🏗 انتخاب نوع کمپانی</h2>`; COMPANIES.forEach(c=>{ html+=`<div class="companyOption" onclick="createCompany('${c.id}')"><div class="title">${c.title}</div><div class="desc">${c.desc}</div></div>`; }); html+=`<button class="close" onclick="closeModal()">انصراف</button>`; openModal(html); };
+function createCompany(id){ const def=COMPANIES.find(c=>c.id===id); state.company={...def,level:1}; closeModal(); document.getElementById('buildCompanyBtn').disabled=true; document.getElementById('assetsToggleBtn').disabled=false; document.getElementById('upgradeBtn').disabled=false; if(def.canBuyMine){ document.getElementById('buyMineBtn').disabled=false; document.getElementById('buyMineBtn').textContent=def.id==='oil'?'🛢 خرید چاه نفت (۵,۰۰۰)':'⛏ خرید معدن (۵,۰۰۰)'; }else{ document.getElementById('buyMineBtn').disabled=true; document.getElementById('buyMineBtn').textContent='⛏ خرید معدن (نیاز به شرکت معدنی)'; } toast(`کمپانی ${def.title} ساخته شد!`); updateUI(); }
+const MINE_COST=5000; document.getElementById('buyMineBtn').onclick=()=>{ if(!state.company||!state.company.canBuyMine){toast('فقط شرکت معدنی/نفتی می‌تواند معدن بخرد',true);return;} if(state.money<MINE_COST){toast('پول کافی ندارید!',true);return;} state.money-=MINE_COST; const income=Math.floor(80+Math.random()*120); const label=state.company.id==='oil'?'چاه نفت':'معدن'; state.assets.push({income,type:label,id:Date.now()}); toast(`${label} جدید خریداری شد! (+${income}/ماه)`); updateUI(); };
+document.getElementById('upgradeBtn').onclick=()=>{ if(!state.company)return; const cost=state.company.upgradeCost*state.company.level; if(state.money<cost){toast(`پول کافی ندارید! نیاز: ${cost.toLocaleString('en-US')}`,true);return;} state.money-=cost; state.company.level+=1; toast(`کمپانی به سطح ${state.company.level} ارتقاء یافت!`); updateUI(); };
+document.getElementById('assetsToggleBtn').onclick=()=>{ const p=document.getElementById('assetsPanel'); p.style.display=p.style.display==='block'?'none':'block'; renderAssets(); };
+function renderAssets(){ const list=document.getElementById('assetsList'); if(state.assets.length===0){list.innerHTML=`<div class="empty">هنوز دارایی‌ای ندارید.</div>`;return;} list.innerHTML=state.assets.map((a,i)=>`<div class="assetItem"><span>${a.type} #${i+1}</span><span class="income">+${a.income}/ماه</span></div>`).join(''); }
+document.querySelectorAll('.speedBtn').forEach(btn=>{ btn.onclick=()=>{ const s=parseInt(btn.dataset.speed); if(s===0){ state.running=!state.running; btn.classList.toggle('active',!state.running); btn.textContent=state.running?'⏸':'▶'; return; } state.speed=s; state.running=true; document.querySelector('[data-speed="0"]').textContent='⏸'; document.querySelector('[data-speed="0"]').classList.remove('active'); document.querySelectorAll('.speedBtn').forEach(b=>{if(b.dataset.speed!=='0')b.classList.remove('active');}); btn.classList.add('active'); state.timeAccumulator=0; }; });
+function gameLoop(now){ const dt=now-state.lastFrame; state.lastFrame=now; if(state.running){ state.timeAccumulator+=dt*state.speed; while(state.timeAccumulator>=state.msPerMonth){ state.timeAccumulator-=state.msPerMonth; advanceMonth(); } } requestAnimationFrame(gameLoop); }
+function advanceMonth(){ state.date.setMonth(state.date.getMonth()+1); let income=0; if(state.company){ income+=state.company.baseIncome*state.company.level; state.assets.forEach(a=>income+=a.income); } if(income>0){ state.money+=income; flashMoney(); } const dateEl=document.getElementById('dateDisplay'); dateEl.classList.add('tick'); setTimeout(()=>dateEl.classList.remove('tick'),200); updateUI(); if(state.country&&state.countryStats[state.country.name]){ const s=state.countryStats[state.country.name]; s.gdp+=Math.floor(income*0.5); s.industry=Math.min(10,s.industry+(income>500?0.1:0.02)); } }
+function flashMoney(){ const el=document.getElementById('money'); el.classList.add('flash'); setTimeout(()=>el.classList.remove('flash'),300); }
+const monthsFa=['ژانویه','فوریه','مارس','آپریل','مه','ژوئن','ژوئیه','اوت','سپتامبر','اکتبر','نوامبر','دسامبر']; const toFa=n=>n.toString().replace(/\d/g,d=>'۰۱۲۳۴۵۶۷۸۹'[d]);
+function updateUI(){ document.getElementById('money').textContent=toFa(state.money.toLocaleString('en-US')); document.getElementById('companyName').textContent=state.company?state.company.title:'—'; document.getElementById('assetCount').textContent=toFa(state.assets.length); let income=0; if(state.company){ income+=state.company.baseIncome*state.company.level; state.assets.forEach(a=>income+=a.income); } document.getElementById('income').textContent=toFa(income.toLocaleString('en-US')); const d=state.date; document.getElementById('dateDisplay').textContent=`${toFa(d.getDate())} ${monthsFa[d.getMonth()]} ${toFa(d.getFullYear())}`; if(state.company){ const cost=state.company.upgradeCost*state.company.level; document.getElementById('upgradeBtn').textContent=`⬆ ارتقاء (${toFa(cost.toLocaleString('en-US'))})`; } }
+let toastTimer; function toast(msg,isError=false){ const t=document.getElementById('toast'); t.textContent=msg; t.classList.toggle('error',isError); t.classList.add('show'); clearTimeout(toastTimer); toastTimer=setTimeout(()=>t.classList.remove('show'),2500); }
+document.addEventListener('keydown',e=>{ if(document.getElementById('game').style.display!=='block')return; if(e.code==='Space'){e.preventDefault();document.querySelector('[data-speed="0"]').click();} if(e.key==='1')document.querySelector('[data-speed="1"]').click(); if(e.key==='2')document.querySelector('[data-speed="2"]').click(); if(e.key==='3')document.querySelector('[data-speed="4"]').click(); if(e.key==='4')document.querySelector('[data-speed="8"]').click(); });
+window.createCompany=createCompany; window.closeModal=closeModal;
+initMap().catch(err=>{ document.getElementById('loading').innerHTML=`<p style="color:#ef5350">خطا: ${err.message}</p><p style="color:#90a4ae;font-size:.8rem">اتصال اینترنت را بررسی کنید</p>`; });
 </script>
 </body>
 </html>
