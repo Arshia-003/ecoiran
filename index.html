@@ -13,17 +13,27 @@
     position:fixed; inset:0; background:radial-gradient(circle at center,#14243d,#050810);
     display:flex; flex-direction:column; z-index:100; transition:opacity .6s;
   }
-  #selectHeader { padding:18px; text-align:center; background:#0a1220dd; border-bottom:1px solid #263238; }
-  #selectHeader h1 { font-size:1.8rem; color:#ffd54f; text-shadow:0 0 20px #ffb30055; }
-  #selectHeader p { color:#90a4ae; font-size:.85rem; margin-top:4px; }
-  #mapContainer { flex:1; position:relative; overflow:hidden; background:#0d1622; }
+  #selectHeader { padding:16px; text-align:center; background:#0a1220dd; border-bottom:1px solid #263238; z-index:2; }
+  #selectHeader h1 { font-size:1.7rem; color:#ffd54f; text-shadow:0 0 20px #ffb30055; }
+  #selectHeader p { color:#90a4ae; font-size:.82rem; margin-top:3px; }
+  #mapContainer { flex:1; position:relative; overflow:hidden; background:#0d1622; cursor:grab; }
+  #mapContainer.dragging { cursor:grabbing; }
   #mapContainer svg { width:100%; height:100%; display:block; }
 
   .countryHit {
-    fill:#2e4a3a; stroke:#1a2634; stroke-width:0.8; cursor:pointer;
-    transition:fill .15s, filter .15s;
+    stroke:#0a0e17; stroke-width:0.5; cursor:pointer;
+    transition:filter .15s, stroke .15s, stroke-width .15s;
   }
-  .countryHit:hover { fill:#ffd54f !important; filter:drop-shadow(0 0 6px #ffd54f); }
+  .countryHit:hover { filter:brightness(1.6) drop-shadow(0 0 4px #fff); stroke:#ffd54f; stroke-width:1.2; }
+  .countryHit.selectable { cursor:pointer; }
+
+  .countryLabel {
+    fill:#e0e0e0; font-size:5px; font-weight:700; pointer-events:none;
+    text-anchor:middle; dominant-baseline:middle;
+    paint-order:stroke; stroke:#0a0e17; stroke-width:1.2px; stroke-linejoin:round;
+    opacity:0; transition:opacity .2s;
+  }
+  .countryLabel.visible { opacity:1; }
 
   #tooltip {
     position:absolute; background:#0f1622f0; border:1px solid #ffd54f;
@@ -32,12 +42,23 @@
     box-shadow:0 4px 12px #000a;
   }
 
+  #zoomControls {
+    position:absolute; bottom:16px; right:16px; z-index:30;
+    display:flex; flex-direction:column; gap:6px;
+  }
+  #zoomControls button {
+    width:40px; height:40px; border-radius:10px; border:1px solid #2c3e50;
+    background:#0f1622ee; color:#e0e0e0; cursor:pointer; font-size:1.2rem;
+    font-weight:700; transition:.15s; backdrop-filter:blur(6px);
+  }
+  #zoomControls button:hover { border-color:#ffd54f; color:#ffd54f; }
+
   /* ===== صفحه بازی ===== */
   #game { display:none; height:100vh; position:relative; }
-  #gameMap { position:absolute; inset:0; background:#0d1622; }
+  #gameMap { position:absolute; inset:0; background:#0d1622; overflow:hidden; }
   #gameMap svg { width:100%; height:100%; }
-  .gameCountry { fill:#2e4a3a; stroke:#1a2634; stroke-width:0.8; }
-  .gameCountry.home { fill:#ffd54f; filter:drop-shadow(0 0 8px #ffd54f); }
+  .gameCountry { stroke:#0a0e17; stroke-width:0.5; }
+  .gameCountry.home { stroke:#ffd54f; stroke-width:1.5; filter:drop-shadow(0 0 8px #ffd54f); }
 
   #flagBox {
     position:absolute; top:14px; left:14px; z-index:20;
@@ -55,10 +76,7 @@
     padding:8px 14px; display:flex; align-items:center; gap:6px;
     backdrop-filter:blur(8px); box-shadow:0 4px 20px #0008;
   }
-  #dateDisplay {
-    font-weight:700; font-size:1rem; color:#e3f2fd; min-width:140px;
-    text-align:center; padding:0 8px; transition:color .2s;
-  }
+  #dateDisplay { font-weight:700; font-size:1rem; color:#e3f2fd; min-width:140px; text-align:center; padding:0 8px; transition:color .2s; }
   #dateDisplay.tick { color:#ffd54f; }
   .speedBtn {
     background:#182233; border:1px solid #2c3e50; color:#90a4ae; border-radius:8px;
@@ -101,26 +119,14 @@
   .assetItem .income { color:#66bb6a; font-weight:700; }
   .empty { color:#78909c; font-size:.83rem; text-align:center; padding:10px 0; }
 
-  #modal {
-    position:fixed; inset:0; background:#000a; z-index:200;
-    display:none; align-items:center; justify-content:center;
-  }
-  #modal .box {
-    background:#101a28; border:1px solid #ffd54f66; border-radius:16px;
-    padding:26px; width:420px; max-width:92vw; box-shadow:0 10px 40px #000;
-  }
+  #modal { position:fixed; inset:0; background:#000a; z-index:200; display:none; align-items:center; justify-content:center; }
+  #modal .box { background:#101a28; border:1px solid #ffd54f66; border-radius:16px; padding:26px; width:420px; max-width:92vw; box-shadow:0 10px 40px #000; }
   #modal h2 { color:#ffd54f; margin-bottom:18px; font-size:1.2rem; }
-  .companyOption {
-    background:#182233; border:1px solid #2c3e50; border-radius:10px;
-    padding:14px; margin-bottom:10px; cursor:pointer; transition:.15s;
-  }
+  .companyOption { background:#182233; border:1px solid #2c3e50; border-radius:10px; padding:14px; margin-bottom:10px; cursor:pointer; transition:.15s; }
   .companyOption:hover { border-color:#ffd54f; background:#233149; transform:translateX(-4px); }
   .companyOption .title { font-weight:700; margin-bottom:4px; color:#e3f2fd; }
   .companyOption .desc { font-size:.78rem; color:#90a4ae; }
-  #modal .close {
-    margin-top:12px; background:#263238; color:#e0e0e0; border:none;
-    border-radius:8px; padding:12px; width:100%; cursor:pointer; font-weight:600;
-  }
+  #modal .close { margin-top:12px; background:#263238; color:#e0e0e0; border:none; border-radius:8px; padding:12px; width:100%; cursor:pointer; font-weight:600; }
   #modal .close:hover { background:#37474f; }
 
   #toast {
@@ -132,17 +138,16 @@
   #toast.show { opacity:1; }
   #toast.error { background:#ef5350; color:#fff; box-shadow:0 6px 24px #ef535044; }
 
-  /* لودینگ */
-  #loading {
-    position:fixed; inset:0; background:#0a0e17; display:flex;
-    align-items:center; justify-content:center; z-index:500; flex-direction:column; gap:16px;
-  }
-  #loading .spinner {
-    width:48px; height:48px; border:4px solid #263238; border-top-color:#ffd54f;
-    border-radius:50%; animation:spin 1s linear infinite;
-  }
+  #loading { position:fixed; inset:0; background:#0a0e17; display:flex; align-items:center; justify-content:center; z-index:500; flex-direction:column; gap:16px; }
+  #loading .spinner { width:48px; height:48px; border:4px solid #263238; border-top-color:#ffd54f; border-radius:50%; animation:spin 1s linear infinite; }
   @keyframes spin { to { transform:rotate(360deg); } }
   #loading p { color:#90a4ae; font-size:.9rem; }
+
+  #hint {
+    position:absolute; bottom:16px; left:16px; z-index:30;
+    background:#0f1622cc; border:1px solid #2c3e50; border-radius:8px;
+    padding:6px 12px; font-size:.75rem; color:#90a4ae;
+  }
 </style>
 </head>
 <body>
@@ -152,11 +157,10 @@
   <p>در حال بارگذاری نقشه جهان...</p>
 </div>
 
-<!-- ===== صفحه انتخاب کشور ===== -->
 <div id="selectScreen" style="display:none;">
   <div id="selectHeader">
     <h1>🌍 EMPIRE BUILDER</h1>
-    <p>روی نقشه، روی کشور خود کلیک کنید</p>
+    <p>روی کشور خود کلیک کنید | با اسکرول زوم کنید | با درگ جابه‌جا کنید</p>
   </div>
   <div id="mapContainer">
     <svg id="worldMap" viewBox="0 0 1000 500" preserveAspectRatio="xMidYMid meet">
@@ -164,10 +168,15 @@
       <g id="countriesLayer"></g>
     </svg>
     <div id="tooltip"></div>
+    <div id="zoomControls">
+      <button id="zoomIn">+</button>
+      <button id="zoomOut">−</button>
+      <button id="zoomReset">⟲</button>
+    </div>
+    <div id="hint">🖱 اسکرول=زوم | درگ=جابه‌جایی</div>
   </div>
 </div>
 
-<!-- ===== صفحه بازی ===== -->
 <div id="game">
   <div id="gameMap">
     <svg id="gameSvg" viewBox="0 0 1000 500" preserveAspectRatio="xMidYMid slice">
@@ -218,41 +227,88 @@
 
 <script>
 /* ============================================================
-   بارگذاری نقشه واقعی از CDN (Natural Earth 110m، از طریق world-atlas)
-   داده‌ها: TopoJSON، نیاز به topojson-client برای تبدیل دارد
+   بارگذاری نقشه از CDN
    ============================================================ */
 const MAP_URL = 'https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json';
 const TOPO_URL = 'https://cdn.jsdelivr.net/npm/topojson-client@3/dist/topojson-client.min.js';
 
 /* ============================================================
-   اطلاعات کشورها (نام فارسی، پرچم، بونوس)
-   با کد ISO Alpha-2 مطابقت داده می‌شود
+   نقشه نام انگلیسی → اطلاعات فارسی
    ============================================================ */
 const COUNTRY_INFO = {
-  ir: { name:'ایران', flag:'🇮🇷', bonus:'نفت +۲۰٪' },
-  us: { name:'آمریکا', flag:'🇺🇸', bonus:'صنعت +۲۵٪' },
-  de: { name:'آلمان', flag:'🇩🇪', bonus:'تکنولوژی +۳۰٪' },
-  gb: { name:'انگلستان', flag:'🇬🇧', bonus:'تجارت +۲۰٪' },
-  fr: { name:'فرانسه', flag:'🇫🇷', bonus:'کشاورزی +۲۰٪' },
-  ru: { name:'روسیه', flag:'🇷🇺', bonus:'معدن +۲۵٪' },
-  cn: { name:'چین', flag:'🇨🇳', bonus:'تولید +۳۰٪' },
-  jp: { name:'ژاپن', flag:'🇯🇵', bonus:'تکنولوژی +۲۵٪' },
-  in: { name:'هند', flag:'🇮🇳', bonus:'نیروی کار +۲۰٪' },
-  br: { name:'برزیل', flag:'🇧🇷', bonus:'کشاورزی +۲۵٪' },
-  ca: { name:'کانادا', flag:'🇨🇦', bonus:'معدن +۲۰٪' },
-  au: { name:'استرالیا', flag:'🇦🇺', bonus:'معدن +۳۰٪' },
-  tr: { name:'ترکیه', flag:'🇹🇷', bonus:'تجارت +۱۵٪' },
-  eg: { name:'مصر', flag:'🇪🇬', bonus:'تجارت +۱۵٪' },
-  sa: { name:'عربستان', flag:'🇸🇦', bonus:'نفت +۳۰٪' },
-  kr: { name:'کره جنوبی', flag:'🇰🇷', bonus:'تکنولوژی +۲۵٪' },
-  za: { name:'آفریقای جنوبی', flag:'🇿🇦', bonus:'معدن +۲۵٪' },
-  mx: { name:'مکزیک', flag:'🇲🇽', bonus:'نفت +۱۵٪' },
-  it: { name:'ایتالیا', flag:'🇮🇹', bonus:'تجارت +۱۵٪' },
-  es: { name:'اسپانیا', flag:'🇪🇸', bonus:'کشاورزی +۱۵٪' },
-  ar: { name:'آرژانتین', flag:'🇦🇷', bonus:'کشاورزی +۲۰٪' },
-  id: { name:'اندونزی', flag:'🇮🇩', bonus:'نیروی کار +۲۰٪' },
-  ng: { name:'نیجریه', flag:'🇳🇬', bonus:'نفت +۲۰٪' },
-  pk: { name:'پاکستان', flag:'🇵🇰', bonus:'نیروی کار +۱۵٪' },
+  'Iran':           { name:'ایران', flag:'🇮🇷', bonus:'نفت +۲۰٪' },
+  'United States of America': { name:'آمریکا', flag:'🇺🇸', bonus:'صنعت +۲۵٪' },
+  'Germany':        { name:'آلمان', flag:'🇩🇪', bonus:'تکنولوژی +۳۰٪' },
+  'United Kingdom': { name:'انگلستان', flag:'🇬🇧', bonus:'تجارت +۲۰٪' },
+  'France':         { name:'فرانسه', flag:'🇫🇷', bonus:'کشاورزی +۲۰٪' },
+  'Russia':         { name:'روسیه', flag:'🇷🇺', bonus:'معدن +۲۵٪' },
+  'China':          { name:'چین', flag:'🇨🇳', bonus:'تولید +۳۰٪' },
+  'Japan':          { name:'ژاپن', flag:'🇯🇵', bonus:'تکنولوژی +۲۵٪' },
+  'India':          { name:'هند', flag:'🇮🇳', bonus:'نیروی کار +۲۰٪' },
+  'Brazil':         { name:'برزیل', flag:'🇧🇷', bonus:'کشاورزی +۲۵٪' },
+  'Canada':         { name:'کانادا', flag:'🇨🇦', bonus:'معدن +۲۰٪' },
+  'Australia':      { name:'استرالیا', flag:'🇦🇺', bonus:'معدن +۳۰٪' },
+  'Turkey':         { name:'ترکیه', flag:'🇹🇷', bonus:'تجارت +۱۵٪' },
+  'Egypt':          { name:'مصر', flag:'🇪🇬', bonus:'تجارت +۱۵٪' },
+  'Saudi Arabia':   { name:'عربستان', flag:'🇸🇦', bonus:'نفت +۳۰٪' },
+  'South Korea':    { name:'کره جنوبی', flag:'🇰🇷', bonus:'تکنولوژی +۲۵٪' },
+  'South Africa':   { name:'آفریقای جنوبی', flag:'🇿🇦', bonus:'معدن +۲۵٪' },
+  'Mexico':         { name:'مکزیک', flag:'🇲🇽', bonus:'نفت +۱۵٪' },
+  'Italy':          { name:'ایتالیا', flag:'🇮🇹', bonus:'تجارت +۱۵٪' },
+  'Spain':          { name:'اسپانیا', flag:'🇪🇸', bonus:'کشاورزی +۱۵٪' },
+  'Argentina':      { name:'آرژانتین', flag:'🇦🇷', bonus:'کشاورزی +۲۰٪' },
+  'Indonesia':      { name:'اندونزی', flag:'🇮🇩', bonus:'نیروی کار +۲۰٪' },
+  'Nigeria':        { name:'نیجریه', flag:'🇳🇬', bonus:'نفت +۲۰٪' },
+  'Pakistan':       { name:'پاکستان', flag:'🇵🇰', bonus:'نیروی کار +۱۵٪' },
+  'Iraq':           { name:'عراق', flag:'🇮🇶', bonus:'نفت +۲۵٪' },
+  'Afghanistan':    { name:'افغانستان', flag:'🇦🇫', bonus:'معدن +۱۵٪' },
+  'Netherlands':    { name:'هلند', flag:'🇳🇱', bonus:'تجارت +۲۰٪' },
+  'Poland':         { name:'لهستان', flag:'🇵🇱', bonus:'صنعت +۱۵٪' },
+  'Ukraine':        { name:'اوکراین', flag:'🇺🇦', bonus:'کشاورزی +۲۵٪' },
+  'Sweden':         { name:'سوئد', flag:'🇸🇪', bonus:'تکنولوژی +۲۰٪' },
+  'Norway':         { name:'نروژ', flag:'🇳🇴', bonus:'نفت +۲۰٪' },
+  'Vietnam':        { name:'ویتنام', flag:'🇻🇳', bonus:'نیروی کار +۲۰٪' },
+  'Thailand':       { name:'تایلند', flag:'🇹🇭', bonus:'تجارت +۱۵٪' },
+  'Malaysia':       { name:'مالزی', flag:'🇲🇾', bonus:'تجارت +۱۵٪' },
+  'Philippines':    { name:'فیلیپین', flag:'🇵🇭', bonus:'نیروی کار +۱۵٪' },
+  'Colombia':       { name:'کلمبیا', flag:'🇨🇴', bonus:'کشاورزی +۱۵٪' },
+  'Chile':          { name:'شیلی', flag:'🇨🇱', bonus:'معدن +۲۵٪' },
+  'Peru':           { name:'پرو', flag:'🇵🇪', bonus:'معدن +۲۰٪' },
+  'Venezuela':      { name:'ونزوئلا', flag:'🇻🇪', bonus:'نفت +۲۵٪' },
+  'Kazakhstan':     { name:'قزاقستان', flag:'🇰🇿', bonus:'معدن +۲۰٪' },
+  'Algeria':        { name:'الجزایر', flag:'🇩🇿', bonus:'نفت +۲۰٪' },
+  'Morocco':        { name:'مراکش', flag:'🇲🇦', bonus:'کشاورزی +۱۵٪' },
+  'Ethiopia':       { name:'اتیوپی', flag:'🇪🇹', bonus:'کشاورزی +۱۵٪' },
+  'Kenya':          { name:'کنیا', flag:'🇰🇪', bonus:'کشاورزی +۱۵٪' },
+  'Greece':         { name:'یونان', flag:'🇬🇷', bonus:'تجارت +۱۵٪' },
+  'Portugal':       { name:'پرتغال', flag:'🇵🇹', bonus:'تجارت +۱۵٪' },
+  'Belgium':        { name:'بلژیک', flag:'🇧🇪', bonus:'تجارت +۲۰٪' },
+  'Switzerland':    { name:'سوئیس', flag:'🇨🇭', bonus:'تکنولوژی +۲۵٪' },
+  'Austria':        { name:'اتریش', flag:'🇦🇹', bonus:'صنعت +۱۵٪' },
+  'Czechia':        { name:'چک', flag:'🇨🇿', bonus:'صنعت +۱۵٪' },
+  'Romania':        { name:'رومانی', flag:'🇷🇴', bonus:'کشاورزی +۱۵٪' },
+  'Hungary':        { name:'مجارستان', flag:'🇭🇺', bonus:'صنعت +۱۵٪' },
+  'Finland':        { name:'فنلاند', flag:'🇫🇮', bonus:'تکنولوژی +۲۰٪' },
+  'Denmark':        { name:'دانمارک', flag:'🇩🇰', bonus:'تجارت +۱۵٪' },
+  'Ireland':        { name:'ایرلند', flag:'🇮🇪', bonus:'تکنولوژی +۲۰٪' },
+  'New Zealand':    { name:'نیوزیلند', flag:'🇳🇿', bonus:'کشاورزی +۲۰٪' },
+  'Bangladesh':     { name:'بنگلادش', flag:'🇧🇩', bonus:'نیروی کار +۲۰٪' },
+  'Myanmar':        { name:'میانمار', flag:'🇲🇲', bonus:'کشاورزی +۱۵٪' },
+  'Sri Lanka':      { name:'سریلانکا', flag:'🇱🇰', bonus:'تجارت +۱۵٪' },
+  'Nepal':          { name:'نپال', flag:'🇳🇵', bonus:'کشاورزی +۱۵٪' },
+  'Uzbekistan':     { name:'ازبکستان', flag:'🇺🇿', bonus:'کشاورزی +۱۵٪' },
+  'Azerbaijan':     { name:'آذربایجان', flag:'🇦🇿', bonus:'نفت +۲۰٪' },
+  'Georgia':        { name:'گرجستان', flag:'🇬🇪', bonus:'تجارت +۱۵٪' },
+  'Armenia':        { name:'ارمنستان', flag:'🇦🇲', bonus:'تکنولوژی +۱۵٪' },
+  'Syria':          { name:'سوریه', flag:'🇸🇾', bonus:'کشاورزی +۱۵٪' },
+  'Jordan':         { name:'اردن', flag:'🇯🇴', bonus:'تجارت +۱۵٪' },
+  'Lebanon':        { name:'لبنان', flag:'🇱🇧', bonus:'تجارت +۱۵٪' },
+  'Israel':         { name:'اسرائیل', flag:'🇮🇱', bonus:'تکنولوژی +۲۵٪' },
+  'Kuwait':         { name:'کویت', flag:'🇰🇼', bonus:'نفت +۲۵٪' },
+  'Qatar':          { name:'قطر', flag:'🇶🇦', bonus:'نفت +۲۵٪' },
+  'United Arab Emirates': { name:'امارات', flag:'🇦🇪', bonus:'نفت +۲۵٪' },
+  'Oman':           { name:'عمان', flag:'🇴🇲', bonus:'نفت +۲۰٪' },
+  'Yemen':          { name:'یمن', flag:'🇾🇪', bonus:'نفت +۱۵٪' },
 };
 
 /* ============================================================
@@ -276,14 +332,28 @@ const state = {
   date: new Date(1836, 0, 1),
   speed: 1,
   running: true,
-  msPerMonth: 2000,      // هر ماه چقدر طول بکشد (1x)
+  msPerMonth: 2000,
   timeAccumulator: 0,
   lastFrame: 0,
-  mapData: null,          // { iso2: pathD }
+  countries: [], // { name, pathD, labelX, labelY, centerX, centerY, area }
+  zoom: { scale: 1, tx: 0, ty: 0 },
 };
 
 /* ============================================================
-   بارگذاری topojson-client و داده نقشه
+   رنگ پایدار برای هر کشور (hash-based)
+   ============================================================ */
+function colorForCountry(name) {
+  let hash = 0;
+  for (let i = 0; i < name.length; i++) {
+    hash = ((hash << 5) - hash) + name.charCodeAt(i);
+    hash |= 0;
+  }
+  const hue = Math.abs(hash) % 360;
+  return `hsl(${hue}, 35%, 28%)`;
+}
+
+/* ============================================================
+   بارگذاری اسکریپت
    ============================================================ */
 function loadScript(src) {
   return new Promise((resolve, reject) => {
@@ -295,57 +365,84 @@ function loadScript(src) {
   });
 }
 
+/* ============================================================
+   تبدیل TopoJSON به مسیرهای SVG
+   ============================================================ */
 async function initMap() {
   await loadScript(TOPO_URL);
   const topo = await fetch(MAP_URL).then(r => r.json());
-
-  // تبدیل TopoJSON به GeoJSON
   const geo = topojson.feature(topo, topo.objects.countries);
 
-  // تصویربرداری ساده equirectangular
-  // داده Natural Earth مختصات [lon, lat] دارد
   const W = 1000, H = 500;
-  const project = (lon, lat) => {
-    const x = (lon + 180) / 360 * W;
-    const y = (90 - lat) / 180 * H;
-    return [x, y];
-  };
+  const project = (lon, lat) => [
+    (lon + 180) / 360 * W,
+    (90 - lat) / 180 * H
+  ];
 
-  const paths = {}; // iso2 -> pathD (یا name -> pathD)
+  const countries = [];
 
   geo.features.forEach(f => {
-    const iso2 = (f.id || '').toLowerCase();
-    // فیلتر قطب جنوب (خیلی بزرگ است)
-    if (iso2 === 'aq' || iso2 === '010') return;
+    const name = f.properties.name || '';
+    if (!name || name === 'Antarctica') return;
 
     const geom = f.geometry;
     if (!geom) return;
 
     let d = '';
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    let totalArea = 0;
+
     const coords = geom.type === 'Polygon' ? [geom.coordinates] :
                    geom.type === 'MultiPolygon' ? geom.coordinates : [];
 
     coords.forEach(polygon => {
-      polygon.forEach(ring => {
+      polygon.forEach((ring, ringIdx) => {
+        let ringArea = 0;
+        let px = 0, py = 0;
         ring.forEach((pt, i) => {
           const [x, y] = project(pt[0], pt[1]);
           d += (i === 0 ? 'M' : 'L') + x.toFixed(1) + ',' + y.toFixed(1);
+          if (ringIdx === 0) {
+            if (x < minX) minX = x; if (y < minY) minY = y;
+            if (x > maxX) maxX = x; if (y > maxY) maxY = y;
+          }
+          px += x; py += y;
         });
         d += 'Z';
+        // محاسبه مساحت تقریبی (shoelace)
+        for (let i = 0; i < ring.length; i++) {
+          const [x1, y1] = project(ring[i][0], ring[i][1]);
+          const [x2, y2] = project(ring[(i+1) % ring.length][0], ring[(i+1) % ring.length][1]);
+          ringArea += x1 * y2 - x2 * y1;
+        }
+        totalArea += Math.abs(ringArea / 2);
       });
     });
 
-    if (d) paths[iso2] = d;
+    if (!d) return;
+
+    // مرکز جرم تقریبی (bbox center) برای برچسب
+    const cx = (minX + maxX) / 2;
+    const cy = (minY + maxY) / 2;
+
+    countries.push({
+      name,
+      pathD: d,
+      centerX: cx,
+      centerY: cy,
+      area: totalArea,
+    });
   });
 
-  state.mapData = paths;
+  state.countries = countries;
   renderSelectMap();
   document.getElementById('loading').style.display = 'none';
   document.getElementById('selectScreen').style.display = 'flex';
+  initZoomPan();
 }
 
 /* ============================================================
-   رندر نقشه انتخاب کشور
+   رندر نقشه انتخاب
    ============================================================ */
 function renderSelectMap() {
   const layer = document.getElementById('countriesLayer');
@@ -353,12 +450,16 @@ function renderSelectMap() {
   const tooltip = document.getElementById('tooltip');
   const container = document.getElementById('mapContainer');
 
-  Object.entries(state.mapData).forEach(([iso2, d]) => {
-    const info = COUNTRY_INFO[iso2];
+  // پیدا کردن بزرگ‌ترین مساحت برای تعیین برچسب‌ها
+  const maxArea = Math.max(...state.countries.map(c => c.area));
+
+  state.countries.forEach(c => {
+    const info = COUNTRY_INFO[c.name];
     const p = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-    p.setAttribute('d', d);
-    p.setAttribute('class', 'countryHit');
-    p.dataset.iso = iso2;
+    p.setAttribute('d', c.pathD);
+    p.setAttribute('class', 'countryHit' + (info ? ' selectable' : ''));
+    p.setAttribute('fill', info ? colorForCountry(c.name) : '#1a2634');
+    p.dataset.name = c.name;
 
     if (info) {
       p.addEventListener('mouseenter', () => {
@@ -371,20 +472,149 @@ function renderSelectMap() {
         tooltip.style.top  = (e.clientY - rect.top  + 14) + 'px';
       });
       p.addEventListener('mouseleave', () => tooltip.style.display = 'none');
-      p.addEventListener('click', () => selectCountry(iso2));
+      p.addEventListener('click', e => {
+        e.stopPropagation();
+        if (state.dragged) return; // جلوگیری از کلیک بعد از درگ
+        selectCountry(c.name);
+      });
     }
     layer.appendChild(p);
   });
+
+  // برچسب‌ها روی کشورهای شناخته‌شده با مساحت کافی
+  state.countries.forEach(c => {
+    const info = COUNTRY_INFO[c.name];
+    if (!info) return;
+    if (c.area < maxArea * 0.003) return; // خیلی کوچک
+
+    const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+    text.setAttribute('x', c.centerX);
+    text.setAttribute('y', c.centerY);
+    text.setAttribute('class', 'countryLabel');
+    text.textContent = info.name;
+    layer.appendChild(text);
+  });
+
+  // نمایش برچسب‌ها وقتی زوم کافی شد
+  updateLabelVisibility();
+}
+
+function updateLabelVisibility() {
+  const labels = document.querySelectorAll('.countryLabel');
+  const show = state.zoom.scale > 1.3;
+  labels.forEach(l => l.classList.toggle('visible', show));
+}
+
+/* ============================================================
+   زوم و پن با ماوس
+   ============================================================ */
+let isDragging = false;
+let dragStart = { x:0, y:0, tx:0, ty:0 };
+
+function applyTransform() {
+  const g = document.getElementById('countriesLayer');
+  if (!g) return;
+  g.setAttribute('transform',
+    `translate(${state.zoom.tx}, ${state.zoom.ty}) scale(${state.zoom.scale})`);
+  updateLabelVisibility();
+}
+
+function initZoomPan() {
+  const container = document.getElementById('mapContainer');
+  const svg = document.getElementById('worldMap');
+
+  // زوم با wheel
+  container.addEventListener('wheel', e => {
+    e.preventDefault();
+    const rect = container.getBoundingClientRect();
+    const mx = e.clientX - rect.left;
+    const my = e.clientY - rect.top;
+    // مختصات در viewBox
+    const vb = svg.viewBox.baseVal;
+    const px = mx / rect.width * vb.width;
+    const py = my / rect.height * vb.height;
+
+    const delta = e.deltaY < 0 ? 1.15 : 1 / 1.15;
+    const newScale = Math.max(0.5, Math.min(15, state.zoom.scale * delta));
+    const ratio = newScale / state.zoom.scale;
+
+    // زوم حول نقطه ماوس
+    state.zoom.tx = px - (px - state.zoom.tx) * ratio;
+    state.zoom.ty = py - (py - state.zoom.ty) * ratio;
+    state.zoom.scale = newScale;
+
+    applyTransform();
+  }, { passive: false });
+
+  // درگ با ماوس
+  container.addEventListener('mousedown', e => {
+    if (e.button !== 0) return;
+    isDragging = true;
+    state.dragged = false;
+    container.classList.add('dragging');
+    dragStart = {
+      x: e.clientX,
+      y: e.clientY,
+      tx: state.zoom.tx,
+      ty: state.zoom.ty,
+    };
+  });
+
+  window.addEventListener('mousemove', e => {
+    if (!isDragging) return;
+    const dx = e.clientX - dragStart.x;
+    const dy = e.clientY - dragStart.y;
+    if (Math.abs(dx) > 3 || Math.abs(dy) > 3) state.dragged = true;
+
+    const rect = container.getBoundingClientRect();
+    const vb = svg.viewBox.baseVal;
+    const sx = vb.width / rect.width;
+    const sy = vb.height / rect.height;
+
+    state.zoom.tx = dragStart.tx + dx * sx;
+    state.zoom.ty = dragStart.ty + dy * sy;
+    applyTransform();
+  });
+
+  window.addEventListener('mouseup', () => {
+    if (!isDragging) return;
+    isDragging = false;
+    container.classList.remove('dragging');
+    // تأخیر کوتاه تا کلیک بعد از درگ نادیده گرفته شود
+    setTimeout(() => { state.dragged = false; }, 50);
+  });
+
+  // دکمه‌های زوم
+  document.getElementById('zoomIn').onclick = () => zoomAt(1.3);
+  document.getElementById('zoomOut').onclick = () => zoomAt(1/1.3);
+  document.getElementById('zoomReset').onclick = () => {
+    state.zoom = { scale: 1, tx: 0, ty: 0 };
+    applyTransform();
+  };
+}
+
+function zoomAt(factor) {
+  const svg = document.getElementById('worldMap');
+  const vb = svg.viewBox.baseVal;
+  const cx = vb.width / 2;
+  const cy = vb.height / 2;
+  const newScale = Math.max(0.5, Math.min(15, state.zoom.scale * factor));
+  const ratio = newScale / state.zoom.scale;
+
+  state.zoom.tx = cx - (cx - state.zoom.tx) * ratio;
+  state.zoom.ty = cy - (cy - state.zoom.ty) * ratio;
+  state.zoom.scale = newScale;
+  applyTransform();
 }
 
 /* ============================================================
    انتخاب کشور
    ============================================================ */
-function selectCountry(iso2) {
-  const info = COUNTRY_INFO[iso2];
+function selectCountry(name) {
+  const info = COUNTRY_INFO[name];
   if (!info) return;
 
-  state.country = { iso: iso2, ...info };
+  state.country = { name, ...info };
 
   document.getElementById('flagIcon').textContent = info.flag;
   document.getElementById('flagName').textContent = info.name;
@@ -393,10 +623,12 @@ function selectCountry(iso2) {
   // رندر نقشه بازی
   const gameLayer = document.getElementById('gameCountriesLayer');
   gameLayer.innerHTML = '';
-  Object.entries(state.mapData).forEach(([iso, d]) => {
+  const maxArea = Math.max(...state.countries.map(c => c.area));
+  state.countries.forEach(c => {
     const p = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-    p.setAttribute('d', d);
-    p.setAttribute('class', 'gameCountry' + (iso === iso2 ? ' home' : ''));
+    p.setAttribute('d', c.pathD);
+    p.setAttribute('class', 'gameCountry' + (c.name === name ? ' home' : ''));
+    p.setAttribute('fill', c.name === name ? '#ffd54f' : colorForCountry(c.name));
     gameLayer.appendChild(p);
   });
 
@@ -412,7 +644,7 @@ function selectCountry(iso2) {
 }
 
 /* ============================================================
-   مودال
+   بقیه منطق بازی (بدون تغییر)
    ============================================================ */
 const modal = document.getElementById('modal');
 const modalBox = document.getElementById('modalBox');
@@ -420,9 +652,6 @@ function openModal(html) { modalBox.innerHTML = html; modal.style.display = 'fle
 function closeModal() { modal.style.display = 'none'; }
 modal.onclick = e => { if (e.target === modal) closeModal(); };
 
-/* ============================================================
-   ساخت کمپانی
-   ============================================================ */
 document.getElementById('buildCompanyBtn').onclick = () => {
   if (state.company) { toast('شما قبلاً کمپانی دارید!', true); return; }
   let html = `<h2>🏗 انتخاب نوع کمپانی</h2>`;
@@ -458,14 +687,10 @@ function createCompany(id) {
   updateUI();
 }
 
-/* ============================================================
-   خرید معدن
-   ============================================================ */
 const MINE_COST = 5000;
 document.getElementById('buyMineBtn').onclick = () => {
   if (!state.company || !state.company.canBuyMine) {
-    toast('فقط شرکت معدنی/نفتی می‌تواند معدن بخرد', true);
-    return;
+    toast('فقط شرکت معدنی/نفتی می‌تواند معدن بخرد', true); return;
   }
   if (state.money < MINE_COST) { toast('پول کافی ندارید!', true); return; }
   state.money -= MINE_COST;
@@ -476,9 +701,6 @@ document.getElementById('buyMineBtn').onclick = () => {
   updateUI();
 };
 
-/* ============================================================
-   ارتقاء
-   ============================================================ */
 document.getElementById('upgradeBtn').onclick = () => {
   if (!state.company) return;
   const cost = state.company.upgradeCost * state.company.level;
@@ -489,9 +711,6 @@ document.getElementById('upgradeBtn').onclick = () => {
   updateUI();
 };
 
-/* ============================================================
-   پنل دارایی‌ها
-   ============================================================ */
 document.getElementById('assetsToggleBtn').onclick = () => {
   const p = document.getElementById('assetsPanel');
   p.style.display = p.style.display === 'block' ? 'none' : 'block';
@@ -501,17 +720,13 @@ document.getElementById('assetsToggleBtn').onclick = () => {
 function renderAssets() {
   const list = document.getElementById('assetsList');
   if (state.assets.length === 0) {
-    list.innerHTML = `<div class="empty">هنوز دارایی‌ای ندارید.</div>`;
-    return;
+    list.innerHTML = `<div class="empty">هنوز دارایی‌ای ندارید.</div>`; return;
   }
   list.innerHTML = state.assets.map((a, i) =>
     `<div class="assetItem"><span>${a.type} #${i+1}</span><span class="income">+${a.income}/ماه</span></div>`
   ).join('');
 }
 
-/* ============================================================
-   کنترل سرعت زمان
-   ============================================================ */
 document.querySelectorAll('.speedBtn').forEach(btn => {
   btn.onclick = () => {
     const s = parseInt(btn.dataset.speed);
@@ -533,19 +748,13 @@ document.querySelectorAll('.speedBtn').forEach(btn => {
   };
 });
 
-/* ============================================================
-   حلقه بازی — زمان همیشه می‌گذرد (مگر در حالت توقف)
-   ============================================================ */
 function gameLoop(now) {
   const dt = now - state.lastFrame;
   state.lastFrame = now;
-
-  // زمان مستقل از وجود شرکت پیش می‌رود
   if (state.running) {
     state.timeAccumulator += dt * state.speed;
-    const monthDur = state.msPerMonth;
-    while (state.timeAccumulator >= monthDur) {
-      state.timeAccumulator -= monthDur;
+    while (state.timeAccumulator >= state.msPerMonth) {
+      state.timeAccumulator -= state.msPerMonth;
       advanceMonth();
     }
   }
@@ -554,24 +763,18 @@ function gameLoop(now) {
 
 function advanceMonth() {
   state.date.setMonth(state.date.getMonth() + 1);
-
-  // درآمد فقط اگر شرکت وجود داشته باشد
   let income = 0;
   if (state.company) {
     income += state.company.baseIncome * state.company.level;
     state.assets.forEach(a => income += a.income);
   }
-
   if (income > 0) {
     state.money += income;
     flashMoney();
   }
-
-  // انیمیشن تاریخ
   const dateEl = document.getElementById('dateDisplay');
   dateEl.classList.add('tick');
   setTimeout(() => dateEl.classList.remove('tick'), 200);
-
   updateUI();
 }
 
@@ -581,9 +784,6 @@ function flashMoney() {
   setTimeout(() => el.classList.remove('flash'), 300);
 }
 
-/* ============================================================
-   به‌روزرسانی UI
-   ============================================================ */
 const monthsFa = ['ژانویه','فوریه','مارس','آپریل','مه','ژوئن','ژوئیه','اوت','سپتامبر','اکتبر','نوامبر','دسامبر'];
 const toFa = n => n.toString().replace(/\d/g, d => '۰۱۲۳۴۵۶۷۸۹'[d]);
 
@@ -591,18 +791,15 @@ function updateUI() {
   document.getElementById('money').textContent = toFa(state.money.toLocaleString('en-US'));
   document.getElementById('companyName').textContent = state.company ? state.company.title : '—';
   document.getElementById('assetCount').textContent = toFa(state.assets.length);
-
   let income = 0;
   if (state.company) {
     income += state.company.baseIncome * state.company.level;
     state.assets.forEach(a => income += a.income);
   }
   document.getElementById('income').textContent = toFa(income.toLocaleString('en-US'));
-
   const d = state.date;
   document.getElementById('dateDisplay').textContent =
     `${toFa(d.getDate())} ${monthsFa[d.getMonth()]} ${toFa(d.getFullYear())}`;
-
   if (state.company) {
     const cost = state.company.upgradeCost * state.company.level;
     document.getElementById('upgradeBtn').textContent =
@@ -610,9 +807,6 @@ function updateUI() {
   }
 }
 
-/* ============================================================
-   توست
-   ============================================================ */
 let toastTimer;
 function toast(msg, isError = false) {
   const t = document.getElementById('toast');
@@ -623,9 +817,6 @@ function toast(msg, isError = false) {
   toastTimer = setTimeout(() => t.classList.remove('show'), 2500);
 }
 
-/* ============================================================
-   کیبورد
-   ============================================================ */
 document.addEventListener('keydown', e => {
   if (document.getElementById('game').style.display !== 'block') return;
   if (e.code === 'Space') { e.preventDefault(); document.querySelector('[data-speed="0"]').click(); }
@@ -635,15 +826,12 @@ document.addEventListener('keydown', e => {
   if (e.key === '4') document.querySelector('[data-speed="8"]').click();
 });
 
-/* ============================================================
-   شروع
-   ============================================================ */
 window.createCompany = createCompany;
 window.closeModal = closeModal;
 
 initMap().catch(err => {
   document.getElementById('loading').innerHTML =
-    `<p style="color:#ef5350">خطا در بارگذاری نقشه: ${err.message}</p>
+    `<p style="color:#ef5350">خطا: ${err.message}</p>
      <p style="color:#90a4ae;font-size:.8rem">اتصال اینترنت را بررسی کنید</p>`;
 });
 </script>
