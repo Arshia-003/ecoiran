@@ -1,0 +1,415 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<title>Empire Builder - بازی استراتژیک</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; font-family:'Segoe UI', Tahoma, sans-serif; }
+  body { background:#0a0e17; color:#e0e0e0; overflow:hidden; height:100vh; }
+
+  /* ===== صفحه انتخاب کشور ===== */
+  #selectScreen {
+    position:fixed; inset:0; background:radial-gradient(circle at center,#1a2438,#050810);
+    display:flex; flex-direction:column; align-items:center; justify-content:center; z-index:100;
+    transition:opacity .6s;
+  }
+  #selectScreen h1 { font-size:2.6rem; margin-bottom:8px; color:#ffd54f; text-shadow:0 0 20px #ffb30055; }
+  #selectScreen p { color:#90a4ae; margin-bottom:24px; }
+  #countryGrid {
+    display:grid; grid-template-columns:repeat(auto-fill,minmax(120px,1fr));
+    gap:12px; max-width:800px; max-height:50vh; overflow-y:auto; padding:16px;
+    border:1px solid #263238; border-radius:14px; background:#0f1622;
+  }
+  .countryCard {
+    background:#182233; border:1px solid #2c3e50; border-radius:10px; padding:12px;
+    text-align:center; cursor:pointer; transition:.2s; font-size:.9rem;
+  }
+  .countryCard:hover { background:#233149; border-color:#ffd54f; transform:translateY(-3px); box-shadow:0 6px 16px #0008; }
+  .countryCard .flag { font-size:1.8rem; display:block; margin-bottom:6px; }
+
+  /* ===== HUD ===== */
+  #game { display:none; height:100vh; position:relative; }
+
+  /* نقشه پس‌زمینه */
+  #map {
+    position:absolute; inset:0;
+    background:#0d1622;
+    background-image:
+      radial-gradient(circle at 30% 40%, #1c3352 0%, transparent 40%),
+      radial-gradient(circle at 70% 60%, #173b2e 0%, transparent 40%),
+      radial-gradient(circle at 50% 80%, #3a2a1a 0%, transparent 40%);
+  }
+  #map svg { width:100%; height:100%; opacity:.55; }
+
+  /* پرچم گوشه بالا چپ */
+  #flagBox {
+    position:absolute; top:16px; left:16px; z-index:20;
+    background:#0f1622cc; border:1px solid #ffd54f66; border-radius:12px;
+    padding:10px 14px; display:flex; align-items:center; gap:10px; backdrop-filter:blur(6px);
+  }
+  #flagBox .flag { font-size:2rem; }
+  #flagBox .name { font-weight:700; color:#ffd54f; }
+
+  /* نوار زمان بالای صفحه */
+  #timeBar {
+    position:absolute; top:16px; left:50%; transform:translateX(-50%); z-index:20;
+    background:#0f1622ee; border:1px solid #2c3e50; border-radius:14px;
+    padding:8px 16px; display:flex; align-items:center; gap:14px; backdrop-filter:blur(6px);
+  }
+  #dateDisplay { font-weight:700; font-size:1.1rem; color:#e3f2fd; min-width:110px; text-align:center; }
+  .speedBtn {
+    background:#182233; border:1px solid #2c3e50; color:#90a4ae; border-radius:8px;
+    padding:5px 10px; cursor:pointer; font-size:.85rem; transition:.15s;
+  }
+  .speedBtn:hover { border-color:#ffd54f; color:#ffd54f; }
+  .speedBtn.active { background:#ffd54f; color:#0a0e17; font-weight:700; border-color:#ffd54f; }
+  #pauseBtn.active { background:#ef5350; color:#fff; border-color:#ef5350; }
+
+  /* پنل منابع گوشه بالا راست */
+  #resources {
+    position:absolute; top:16px; right:16px; z-index:20;
+    background:#0f1622ee; border:1px solid #2c3e50; border-radius:12px;
+    padding:12px 16px; min-width:200px; backdrop-filter:blur(6px);
+  }
+  #resources .row { display:flex; justify-content:space-between; margin:4px 0; font-size:.9rem; }
+  #resources .row span:last-child { color:#ffd54f; font-weight:700; }
+
+  /* پنل پایین (اکشن‌ها) */
+  #bottomPanel {
+    position:absolute; bottom:16px; left:50%; transform:translateX(-50%); z-index:20;
+    display:flex; gap:10px;
+  }
+  .actionBtn {
+    background:#182233ee; border:1px solid #2c3e50; color:#e0e0e0;
+    border-radius:12px; padding:12px 20px; cursor:pointer; font-size:.95rem;
+    transition:.15s; backdrop-filter:blur(6px);
+  }
+  .actionBtn:hover { border-color:#ffd54f; color:#ffd54f; transform:translateY(-2px); }
+  .actionBtn:disabled { opacity:.4; cursor:not-allowed; }
+
+  /* لیست معادن */
+  #minesPanel {
+    position:absolute; bottom:80px; right:16px; z-index:20; width:260px; max-height:40vh;
+    overflow-y:auto; background:#0f1622ee; border:1px solid #2c3e50; border-radius:12px;
+    padding:12px; display:none; backdrop-filter:blur(6px);
+  }
+  #minesPanel h3 { color:#ffd54f; margin-bottom:8px; font-size:1rem; }
+  .mineItem { display:flex; justify-content:space-between; padding:8px; border-bottom:1px solid #1e2a3a; font-size:.85rem; }
+  .mineItem:last-child { border:none; }
+  .mineItem .income { color:#66bb6a; }
+
+  /* مودال ساخت کمپانی */
+  #modal {
+    position:fixed; inset:0; background:#0008; z-index:200;
+    display:none; align-items:center; justify-content:center;
+  }
+  #modal .box {
+    background:#101a28; border:1px solid #ffd54f66; border-radius:16px;
+    padding:24px; width:380px; max-width:90vw;
+  }
+  #modal h2 { color:#ffd54f; margin-bottom:16px; font-size:1.2rem; }
+  .companyOption {
+    background:#182233; border:1px solid #2c3e50; border-radius:10px;
+    padding:12px; margin-bottom:10px; cursor:pointer; transition:.15s;
+  }
+  .companyOption:hover { border-color:#ffd54f; background:#233149; }
+  .companyOption .title { font-weight:700; margin-bottom:4px; }
+  .companyOption .desc { font-size:.8rem; color:#90a4ae; }
+  #modal .close { margin-top:10px; background:#263238; color:#e0e0e0; border:none; border-radius:8px; padding:10px; width:100%; cursor:pointer; }
+
+  /* توست پیام */
+  #toast {
+    position:fixed; top:80px; left:50%; transform:translateX(-50%);
+    background:#ffd54f; color:#0a0e17; padding:10px 20px; border-radius:10px;
+    font-weight:700; z-index:300; opacity:0; transition:.3s; pointer-events:none;
+  }
+  #toast.show { opacity:1; top:90px; }
+</style>
+</head>
+<body>
+
+<!-- ===== صفحه انتخاب کشور ===== -->
+<div id="selectScreen">
+  <h1>🌍 EMPIRE BUILDER</h1>
+  <p>کشور خود را انتخاب کنید و امپراتوری اقتصادی بسازید</p>
+  <div id="countryGrid"></div>
+</div>
+
+<!-- ===== صفحه بازی ===== -->
+<div id="game">
+  <div id="map">
+    <!-- نقشه ساده جهان (SVG) -->
+    <svg viewBox="0 0 1000 500" preserveAspectRatio="xMidYMid slice">
+      <path d="M150,120 Q200,80 260,100 L300,150 Q280,200 230,210 L180,190 Q140,160 150,120Z" fill="#2e4a3a"/>
+      <path d="M180,220 Q240,240 260,300 L240,380 Q200,420 170,390 L150,300Z" fill="#2e4a3a"/>
+      <path d="M420,100 Q480,80 540,110 L560,160 Q520,200 470,190 L430,160Z" fill="#2e4a3a"/>
+      <path d="M440,210 Q520,220 540,300 L510,380 Q460,410 430,370 L420,290Z" fill="#3a4a2e"/>
+      <path d="M600,120 Q700,100 780,140 L800,220 Q760,280 680,270 L620,220Z" fill="#2e4a3a"/>
+      <path d="M620,290 Q700,300 740,360 L700,420 Q640,430 610,390 L600,330Z" fill="#4a3a2e"/>
+      <path d="M820,180 Q880,170 920,210 L930,270 Q890,300 850,280 L820,240Z" fill="#2e4a3a"/>
+      <path d="M300,320 Q340,310 360,350 L340,400 Q300,410 280,380Z" fill="#2e4a3a"/>
+    </svg>
+  </div>
+
+  <!-- پرچم کشور -->
+  <div id="flagBox">
+    <span class="flag" id="flagIcon">🏳️</span>
+    <span class="name" id="flagName">—</span>
+  </div>
+
+  <!-- نوار زمان -->
+  <div id="timeBar">
+    <button class="speedBtn" data-speed="0">⏸</button>
+    <button class="speedBtn active" data-speed="1">▶ ۱x</button>
+    <button class="speedBtn" data-speed="2">⏩ ۲x</button>
+    <button class="speedBtn" data-speed="4">⏭ ۴x</button>
+    <div id="dateDisplay">۱ ژانویه ۱۸۳۶</div>
+  </div>
+
+  <!-- منابع -->
+  <div id="resources">
+    <div class="row"><span>💰 پول</span><span id="money">۱۰,۰۰۰</span></div>
+    <div class="row"><span>🏭 کمپانی</span><span id="companyName">—</span></div>
+    <div class="row"><span>⛏ معادن</span><span id="mineCount">۰</span></div>
+    <div class="row"><span>📈 درآمد/ماه</span><span id="income">۰</span></div>
+  </div>
+
+  <!-- دکمه‌های اکشن -->
+  <div id="bottomPanel">
+    <button class="actionBtn" id="buildCompanyBtn">🏗 ساخت کمپانی</button>
+    <button class="actionBtn" id="buyMineBtn" disabled>⛏ خرید معدن (۵,۰۰۰)</button>
+    <button class="actionBtn" id="minesToggleBtn" disabled>📋 معادن من</button>
+  </div>
+
+  <!-- پنل معادن -->
+  <div id="minesPanel">
+    <h3>⛏ معادن شما</h3>
+    <div id="minesList"></div>
+  </div>
+</div>
+
+<!-- مودال -->
+<div id="modal">
+  <div class="box" id="modalBox"></div>
+</div>
+
+<!-- توست -->
+<div id="toast"></div>
+
+<script>
+/* ========== داده کشورها ========== */
+const COUNTRIES = [
+  { name:'ایران',      flag:'🇮🇷', bonus:'نفت +۲۰٪' },
+  { name:'آمریکا',     flag:'🇺🇸', bonus:'صنعت +۲۵٪' },
+  { name:'آلمان',      flag:'🇩🇪', bonus:'تکنولوژی +۳۰٪' },
+  { name:'انگلستان',   flag:'🇬🇧', bonus:'تجارت +۲۰٪' },
+  { name:'فرانسه',     flag:'🇫🇷', bonus:'کشاورزی +۲۰٪' },
+  { name:'روسیه',      flag:'🇷🇺', bonus:'معدن +۲۵٪' },
+  { name:'چین',        flag:'🇨🇳', bonus:'تولید +۳۰٪' },
+  { name:'ژاپن',       flag:'🇯🇵', bonus:'تکنولوژی +۲۵٪' },
+  { name:'هند',        flag:'🇮🇳', bonus:'نیروی کار +۲۰٪' },
+  { name:'برزیل',      flag:'🇧🇷', bonus:'کشاورزی +۲۵٪' },
+  { name:'کانادا',     flag:'🇨🇦', bonus:'معدن +۲۰٪' },
+  { name:'استرالیا',   flag:'🇦🇺', bonus:'معدن +۳۰٪' },
+  { name:'ترکیه',      flag:'🇹🇷', bonus:'تجارت +۱۵٪' },
+  { name:'مصر',        flag:'🇪🇬', bonus:'تجارت +۱۵٪' },
+  { name:'عربستان',    flag:'🇸🇦', bonus:'نفت +۳۰٪' },
+  { name:'کره جنوبی',  flag:'🇰🇷', bonus:'تکنولوژی +۲۵٪' },
+];
+
+/* ========== انواع کمپانی ========== */
+const COMPANIES = [
+  { id:'mining',  title:'⛏ شرکت معدنی',   desc:'درآمد پایه بالا، مناسب معدن', baseIncome: 180 },
+  { id:'oil',     title:'🛢 شرکت نفتی',    desc:'درآمد متوسط، رشد سریع',       baseIncome: 220 },
+  { id:'tech',    title:'💻 شرکت فناوری',  desc:'درآمد کم اول، رشد زیاد',      baseIncome: 120 },
+  { id:'trade',   title:'🚢 شرکت تجاری',   desc:'درآمد متعادل و پایدار',       baseIncome: 160 },
+];
+
+/* ========== وضعیت بازی ========== */
+const state = {
+  country: null,
+  money: 10000,
+  company: null,
+  mines: [],
+  date: new Date(1836, 0, 1),
+  speed: 1,
+  running: true,
+  lastTick: 0,
+  msPerMonth: 1500, // هر ماه چقدر طول بکشه در 1x
+};
+
+/* ========== ساخت کارت کشورها ========== */
+const grid = document.getElementById('countryGrid');
+COUNTRIES.forEach(c => {
+  const d = document.createElement('div');
+  d.className = 'countryCard';
+  d.innerHTML = `<span class="flag">${c.flag}</span>${c.name}<br><small style="color:#78909c">${c.bonus}</small>`;
+  d.onclick = () => selectCountry(c);
+  grid.appendChild(d);
+});
+
+function selectCountry(c) {
+  state.country = c;
+  document.getElementById('selectScreen').style.opacity = '0';
+  setTimeout(() => {
+    document.getElementById('selectScreen').style.display = 'none';
+    document.getElementById('game').style.display = 'block';
+  }, 600);
+  document.getElementById('flagIcon').textContent = c.flag;
+  document.getElementById('flagName').textContent = c.name;
+  updateUI();
+  requestAnimationFrame(gameLoop);
+}
+
+/* ========== مودال ========== */
+const modal = document.getElementById('modal');
+const modalBox = document.getElementById('modalBox');
+function openModal(html) { modalBox.innerHTML = html; modal.style.display = 'flex'; }
+function closeModal() { modal.style.display = 'none'; }
+modal.onclick = e => { if (e.target === modal) closeModal(); };
+
+/* ========== دکمه ساخت کمپانی ========== */
+document.getElementById('buildCompanyBtn').onclick = () => {
+  if (state.company) { toast('شما قبلاً کمپانی دارید!'); return; }
+  let html = `<h2>🏗 انتخاب نوع کمپانی</h2>`;
+  COMPANIES.forEach(c => {
+    html += `<div class="companyOption" onclick="createCompany('${c.id}')">
+      <div class="title">${c.title}</div>
+      <div class="desc">${c.desc} — درآمد پایه: ${c.baseIncome}/ماه</div>
+    </div>`;
+  });
+  html += `<button class="close" onclick="closeModal()">انصراف</button>`;
+  openModal(html);
+};
+
+function createCompany(id) {
+  const def = COMPANIES.find(c => c.id === id);
+  state.company = { ...def, level: 1 };
+  closeModal();
+  document.getElementById('buildCompanyBtn').disabled = true;
+  document.getElementById('buyMineBtn').disabled = false;
+  document.getElementById('minesToggleBtn').disabled = false;
+  toast(`کمپانی ${def.title} ساخته شد!`);
+  updateUI();
+}
+window.createCompany = createCompany;
+window.closeModal = closeModal;
+
+/* ========== خرید معدن ========== */
+document.getElementById('buyMineBtn').onclick = () => {
+  const cost = 5000;
+  if (state.money < cost) { toast('پول کافی ندارید!'); return; }
+  state.money -= cost;
+  const income = Math.floor(80 + Math.random() * 120);
+  state.mines.push({ income, id: Date.now() });
+  toast(`معدن جدید خریداری شد! (+${income}/ماه)`);
+  updateUI();
+};
+
+/* ========== نمایش معادن ========== */
+document.getElementById('minesToggleBtn').onclick = () => {
+  const p = document.getElementById('minesPanel');
+  p.style.display = p.style.display === 'block' ? 'none' : 'block';
+  renderMines();
+};
+
+function renderMines() {
+  const list = document.getElementById('minesList');
+  if (state.mines.length === 0) {
+    list.innerHTML = `<div style="color:#78909c;font-size:.85rem">هنوز معدنی ندارید.</div>`;
+    return;
+  }
+  list.innerHTML = state.mines.map((m, i) =>
+    `<div class="mineItem"><span>معدن #${i+1}</span><span class="income">+${m.income}/ماه</span></div>`
+  ).join('');
+}
+
+/* ========== کنترل سرعت زمان ========== */
+document.querySelectorAll('.speedBtn').forEach(btn => {
+  btn.onclick = () => {
+    const s = parseInt(btn.dataset.speed);
+    if (s === 0) {
+      state.running = !state.running;
+      btn.textContent = state.running ? '⏸' : '▶';
+      btn.classList.toggle('active', !state.running);
+      return;
+    }
+    state.speed = s;
+    state.running = true;
+    document.querySelectorAll('.speedBtn').forEach(b => {
+      if (b.dataset.speed !== '0') b.classList.remove('active');
+    });
+    btn.classList.add('active');
+  };
+});
+
+/* ========== حلقه بازی ========== */
+function gameLoop(ts) {
+  if (!state.lastTick) state.lastTick = ts;
+  const dt = ts - state.lastTick;
+  state.lastTick = ts;
+
+  if (state.running && state.company) {
+    const monthDur = state.msPerMonth / state.speed;
+    if (dt >= monthDur) {
+      advanceMonth();
+      state.lastTick = ts;
+    }
+  }
+  requestAnimationFrame(gameLoop);
+}
+
+function advanceMonth() {
+  state.date.setMonth(state.date.getMonth() + 1);
+
+  // درآمد کمپانی
+  let income = 0;
+  if (state.company) {
+    income += state.company.baseIncome * state.company.level;
+  }
+  // درآمد معادن
+  state.mines.forEach(m => income += m.income);
+
+  state.money += income;
+  updateUI();
+}
+
+/* ========== به‌روزرسانی UI ========== */
+const monthsFa = ['ژانویه','فوریه','مارس','آپریل','مه','ژوئن','ژوئیه','اوت','سپتامبر','اکتبر','نوامبر','دسامبر'];
+function toFa(n) { return n.toString().replace(/\d/g, d => '۰۱۲۳۴۵۶۷۸۹'[d]); }
+
+function updateUI() {
+  document.getElementById('money').textContent = toFa(state.money.toLocaleString('en-US'));
+  document.getElementById('companyName').textContent = state.company ? state.company.title : '—';
+  document.getElementById('mineCount').textContent = toFa(state.mines.length);
+
+  let income = 0;
+  if (state.company) income += state.company.baseIncome * state.company.level;
+  state.mines.forEach(m => income += m.income);
+  document.getElementById('income').textContent = toFa(income.toLocaleString('en-US'));
+
+  const d = state.date;
+  document.getElementById('dateDisplay').textContent =
+    `${toFa(d.getDate())} ${monthsFa[d.getMonth()]} ${toFa(d.getFullYear())}`;
+}
+
+/* ========== توست ========== */
+let toastTimer;
+function toast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove('show'), 2500);
+}
+
+/* ========== کیبورد ========== */
+document.addEventListener('keydown', e => {
+  if (e.key === ' ') { e.preventDefault(); document.querySelector('[data-speed="0"]').click(); }
+  if (e.key === '1') document.querySelector('[data-speed="1"]').click();
+  if (e.key === '2') document.querySelector('[data-speed="2"]').click();
+  if (e.key === '4') document.querySelector('[data-speed="4"]').click();
+});
+</script>
+</body>
+</html>
